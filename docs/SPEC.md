@@ -47,6 +47,7 @@ src/
     paths.ts           Excluded-folder rules, rename -> IndexOp
     order.ts           compareSections; orderEntries(sorted, currentPath) hoists the current file
     chain.ts           nextChain(parent, key, maxDepth) -> chain | null (cycle guard)
+    markLayout.ts      layoutMark(mark, selection, hideSyntax) -> styled + hidden spans
     types.ts           Shared core types
   obsidian/
     indexer.ts         Builds/maintains TermIndex from metadataCache + vault events
@@ -108,11 +109,11 @@ The index stores offsets only. Section text is read lazily at hover time via `va
 
 **Live Preview**
 - A CM6 `ViewPlugin` computes decorations over `view.visibleRanges`, using `syntaxTree` to skip code and math nodes.
-- Node names in Obsidian's grammar are not documented. Log them at runtime and skip names containing `code` or `math`, then tighten.
+- Node names in Obsidian's grammar are not documented. Log them at runtime and skip names containing `code` or `math`, then tighten. Implemented as a substring match on `code|math|link|url|comment|frontmatter`, which mirrors Reading view's skip list. The "Log editor syntax nodes" command prints the node names at the cursor.
 - Each mark gets `Decoration.mark` with the same class and `data-` attributes as Reading view. Get the source path from `view.state.field(editorInfoField).file`.
 - When the selection does not touch a mark, hide the `{{`, `}}` and the `target|` prefix with `Decoration.replace`, the same way Obsidian hides link syntax. When the cursor is inside, show the raw text.
 - Only hide syntax when `editorLivePreviewField` is true. In Source mode, mark the text but hide nothing.
-- Recompute on `docChanged`, `viewportChanged` and `selectionSet`.
+- Recompute on `docChanged`, `viewportChanged` and `selectionSet`, plus syntax-tree, file and Live Preview/Source mode changes. Marks are rescanned only for document, viewport, tree or file changes. A selection change rebuilds decorations only when the set of marks the selection touches changed (see `docs/PERFORMANCE.md` P8).
 
 **Hover controller**
 - A single delegated `mouseover` handler, registered with `registerDomEvent` on each window's document (main window, plus `window-open` for popouts), catches `.keyring-mark` from both modes and from inside popovers. There is no per-element wiring. No `mouseout` handler is needed: `HoverPopover` attaches its own listeners to the target element.

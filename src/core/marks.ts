@@ -2,6 +2,7 @@ import type { MarkRange } from './types';
 
 const OPEN = '{{';
 const CLOSE = '}}';
+const PIPE = '|'.charCodeAt(0);
 
 interface Span {
 	readonly from: number;
@@ -16,8 +17,10 @@ interface Span {
  * Jumps between `{{`, `}}` and newlines with `indexOf`, reusing each search
  * result until the scan passes it, so text without marks costs a few native
  * scans (see docs/PERFORMANCE.md, P5).
+ *
+ * `offset` is added to every position, for text sliced from a larger document.
  */
-export function parseMarks(text: string): MarkRange[] {
+export function parseMarks(text: string, offset = 0): MarkRange[] {
 	const marks: MarkRange[] = [];
 	let open = -1;
 	let pos = 0;
@@ -36,7 +39,7 @@ export function parseMarks(text: string): MarkRange[] {
 			pos = at + 1;
 		} else {
 			if (open !== -1) {
-				const mark = toMark(text, open, at + CLOSE.length);
+				const mark = toMark(text, open, at + CLOSE.length, offset);
 				if (mark) marks.push(mark);
 			}
 			open = -1;
@@ -51,11 +54,14 @@ export function parseMarks(text: string): MarkRange[] {
 
 const orEnd = (index: number, text: string): number => (index === -1 ? text.length : index);
 
-function toMark(text: string, from: number, to: number): MarkRange | null {
+function toMark(text: string, from: number, to: number, offset: number): MarkRange | null {
 	const innerFrom = from + OPEN.length;
 	const innerTo = to - CLOSE.length;
-	const pipe = text.indexOf('|', innerFrom);
-	const hasPipe = pipe !== -1 && pipe < innerTo;
+	// Search only inside the mark: an unbounded indexOf would scan to the end of
+	// `text` for every mark without a pipe.
+	let pipe = innerFrom;
+	while (pipe < innerTo && text.charCodeAt(pipe) !== PIPE) pipe += 1;
+	const hasPipe = pipe < innerTo;
 
 	const target = trim(text, { from: innerFrom, to: hasPipe ? pipe : innerTo });
 	if (isEmpty(target)) return null;
@@ -64,12 +70,12 @@ function toMark(text: string, from: number, to: number): MarkRange | null {
 	const shown = isEmpty(display) ? target : display;
 
 	return {
-		from,
-		to,
+		from: from + offset,
+		to: to + offset,
 		target: slice(text, target),
 		display: slice(text, shown),
-		displayFrom: shown.from,
-		displayTo: shown.to,
+		displayFrom: shown.from + offset,
+		displayTo: shown.to + offset,
 	};
 }
 
@@ -79,6 +85,12 @@ function trim(text: string, { from, to }: Span): Span {
 	return { from, to };
 }
 
-const isSpace = (ch: string | undefined): boolean => ch !== undefined && /\s/u.test(ch);
+/** ASCII whitespace by char code; the Unicode regex only for non-ASCII characters. */
+function isSpace(ch: string | undefined): boolean {
+	if (ch === undefined) return false;
+	const code = ch.charCodeAt(0);
+	if (code < 128) return code === 32 || (code >= 9 && code <= 13);
+	return /\s/u.test(ch);
+}
 const isEmpty = ({ from, to }: Span): boolean => from >= to;
 const slice = (text: string, { from, to }: Span): string => text.slice(from, to);

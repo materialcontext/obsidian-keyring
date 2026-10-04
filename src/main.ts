@@ -2,6 +2,7 @@ import { Notice, Plugin } from 'obsidian';
 import { stats } from './core/termIndex';
 import { registerHover } from './obsidian/hover';
 import { createIndexer, type Indexer } from './obsidian/indexer';
+import { createLivePreview } from './obsidian/livePreview';
 import { markPostProcessor } from './obsidian/readingView';
 import { DEFAULT_SETTINGS, type KeyringSettings } from './settings';
 
@@ -16,6 +17,8 @@ export default class KeyringPlugin extends Plugin {
 		this.indexer = createIndexer(this.app, this, getSettings);
 		this.registerMarkdownPostProcessor(markPostProcessor(getSettings));
 		registerHover(this, this.indexer, getSettings);
+		const livePreview = createLivePreview(getSettings);
+		this.registerEditorExtension(livePreview.extension);
 
 		this.addCommand({
 			id: 'dump-index-stats',
@@ -25,6 +28,16 @@ export default class KeyringPlugin extends Plugin {
 				const summary = `${keys} keys, ${sections} sections, ${files} files`;
 				console.debug(`[keyring] index: ${summary}`);
 				new Notice(`Keyring index: ${summary}`);
+			},
+		});
+
+		this.addCommand({
+			id: 'log-syntax-nodes',
+			name: 'Log editor syntax nodes',
+			callback: () => {
+				const names = livePreview.describeSyntaxAtCursor()?.join(' < ') ?? 'no open editor';
+				console.debug(`[keyring] syntax nodes at cursor: ${names}`);
+				new Notice(`Syntax nodes at cursor: ${names}`);
 			},
 		});
 	}

@@ -85,6 +85,22 @@ The bigger win is structural. Marks can't span lines (SPEC decision), so Live Pr
 
 The full build is linear: 50 ms for 10k files on the benchmark machine. On a slow device, or with a 50k-note vault, that becomes hundreds of milliseconds of frozen UI at startup.
 
+### P8. Live Preview (measured in milestone 5)
+
+Measured in headless Chromium with real CodeMirror 6 and `@codemirror/lang-markdown`, on a deliberately dense page: ~100 marks in 36 visible lines. Plugin time per transaction:
+
+| Update      | First version           | Now                                                |
+| ----------- | ----------------------- | -------------------------------------------------- |
+| Keystroke   | ~74–93 µs               | **~48 µs** (CodeMirror's own transaction: ~360 µs) |
+| Cursor move | ~57 µs total added cost | **~2 µs**                                          |
+
+The fixes, in order of impact:
+
+1. **Syntax checks.** Checking each mark with `resolveInner` scanned the document's ~450 top-level nodes per mark. One `tree.iterate` collecting skipped spans replaced it.
+2. **No-op cursor moves.** A cursor move that enters or leaves no mark keeps the old decorations, so CodeMirror has nothing to diff.
+3. **A real bug in `parseMarks`.** For a mark without `|display`, the pipe search ran to the end of the text, which is quadratic. Bounding it took 100 KB of plain marks from 210 to 60 µs.
+4. **Per-mark costs.** A char-code fast path for ASCII whitespace, and `parseMarks(text, offset)` in place of copying every mark to shift it.
+
 ### P7. Smaller costs
 
 - **`normalizeKey`:** 170 ns, of which NFC is about 30%. Memoizing per target string brings a hit down to ~10 ns. Heading keys are already computed only once, at index time.
@@ -134,9 +150,9 @@ These cost nothing extra if adopted while milestones 4 and 5 are written:
 
 - **Mark scanning:** the `indexOf`-based `parseMarks` (P5).
 - **Live Preview:**
-  - Re-scan only the lines a transaction touched.
-  - Map the existing decorations through unrelated changes, not rebuild them.
+  - ~~Re-scan only the lines a transaction touched.~~ Superseded by measurement in milestone 5: with the `indexOf` scanner, re-scanning a whole viewport costs about what hashing its lines for a cache would. Instead, rescan only when the document, viewport, syntax tree or file changes, and on selection-only updates rebuild decorations only if the set of marks the selection touches changed.
   - Keep the work within the visible ranges.
+  - Never call `resolveInner` per mark. It scans the document's top-level nodes from the start each time. Collect skipped spans with one `tree.iterate` over the visible lines instead.
 - **Reading view:** run the `textContent.includes('{{')` check before walking (P7).
 - **Hover:**
   - Do the lookup and start `cachedRead` _during_ the hover delay, so content is ready when the delay ends.
@@ -169,7 +185,7 @@ These are targets for plugin-owned work, measured at **p99**. The low-end column
 
 **Phase 0 (this PR).** This document, plus the benchmark harness (`bench/`).
 
-**Phase 1 (fold into milestones 4 and 5).** _Milestone 4 delivered the `indexOf` scanner, presorted postings, the Reading view check, prefetch during the hover delay, lazy bodies and the cap. Measured: hover ordering of 1000 entries 267 → 7.7 µs; `parseMarks` 8 KB 55 → 4.7 µs, 100 KB 690 → 56 µs, 100 KB without marks 675 → 2.1 µs. Line-incremental Live Preview remains for milestone 5._ The §4.4 rules: `indexOf` scanner, line-incremental Live Preview, the Reading view check, hover prefetch, lazy rendering with a cap of ~20 entries plus "Show N more" (accepted), and target memoization. Also presorted postings (P4), a small, contained change to `termIndex`.
+**Phase 1 (fold into milestones 4 and 5).** _Milestone 4 delivered the `indexOf` scanner, presorted postings, the Reading view check, prefetch during the hover delay, lazy bodies and the cap. Measured: hover ordering of 1000 entries 267 → 7.7 µs; `parseMarks` 8 KB 55 → 4.7 µs, 100 KB 690 → 56 µs, 100 KB without marks 675 → 2.1 µs. Milestone 5 delivered Live Preview within budget (see P8)._ The §4.4 rules: `indexOf` scanner, line-incremental Live Preview, the Reading view check, hover prefetch, lazy rendering with a cap of ~20 entries plus "Show N more" (accepted), and target memoization. Also presorted postings (P4), a small, contained change to `termIndex`.
 
 - _Exit:_ the hover and keystroke rows of §5 are met on desktop.
 
