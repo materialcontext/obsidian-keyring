@@ -1,0 +1,10 @@
+{
+	"id": "keyring",
+	"name": "Keyring",
+	"version": "0.1.0",
+	"minAppVersion": "1.5.0",
+	"description": "Hover {{term}} marks to see every section in your vault with a matching heading.",
+	"author": "materialcontext",
+	"authorUrl": "https://github.com/materialcontext",
+	"isDesktopOnly": true
+}
