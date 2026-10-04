@@ -11,6 +11,7 @@ npm install
 npm run dev      # watch build -> main.js
 npm run build    # typecheck + production build
 npm test         # vitest (core only)
+npm run bench    # core timings; see docs/PERFORMANCE.md
 npm run lint
 npm run format
 ```

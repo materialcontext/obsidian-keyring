@@ -10,6 +10,8 @@
 		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
 		"test": "vitest run",
 		"test:watch": "vitest",
+		"bench": "esbuild bench/core.ts --bundle --platform=node --log-level=warning --outfile=node_modules/.cache/keyring-bench/core.cjs && node node_modules/.cache/keyring-bench/core.cjs",
+		"bench:memory": "esbuild bench/memory.ts --bundle --platform=node --log-level=warning --outfile=node_modules/.cache/keyring-bench/memory.cjs && node --expose-gc node_modules/.cache/keyring-bench/memory.cjs",
 		"lint": "eslint .",
 		"format": "prettier --write .",
 		"format:check": "prettier --check .",

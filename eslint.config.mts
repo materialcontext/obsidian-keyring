@@ -56,5 +56,14 @@ export default defineConfig(
 		files: ['tests/**/*.ts'],
 		languageOptions: { globals: { ...globals.node } },
 	},
+	{
+		// Benchmarks are Node scripts, not plugin code: they print results and use globalThis.gc.
+		files: ['bench/**/*.ts'],
+		languageOptions: { globals: { ...globals.node } },
+		rules: {
+			'obsidianmd/rule-custom-message': 'off',
+			'obsidianmd/no-global-this': 'off',
+		},
+	},
 	prettier,
 );
