@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { isIndexable, isUnder, opForRename, pathRules, rebase } from '../../src/core/paths';
+import {
+	basename,
+	isIndexable,
+	isUnder,
+	opForRename,
+	pathRules,
+	rebase,
+} from '../../src/core/paths';
 import { section } from '../helpers';
 
 const rules = pathRules(['Templates', ' /Archive/Old/ ', '', '  ']);
@@ -86,5 +93,17 @@ describe('opForRename', () => {
 		opForRename('a.md', 'b.md', rules, counting);
 		opForRename('a.md', 'Templates/a.md', rules, counting);
 		expect(calls).toBe(0);
+	});
+});
+
+describe('basename', () => {
+	it('drops the folder and the .md extension', () => {
+		expect(basename('a/b/Note name.md')).toBe('Note name');
+		expect(basename('top.md')).toBe('top');
+	});
+
+	it('keeps other extensions and dots inside the name', () => {
+		expect(basename('a/v1.2 notes.md')).toBe('v1.2 notes');
+		expect(basename('a/file.canvas')).toBe('file.canvas');
 	});
 });

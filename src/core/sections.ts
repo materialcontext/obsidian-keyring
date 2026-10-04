@@ -29,3 +29,8 @@ export function sectionsFromHeadings(path: string, headings: readonly HeadingInf
 		bodyEnd: ends[i] ?? null,
 	}));
 }
+
+/** The body text of `section` within its file's current `text`. */
+export function sectionBody(text: string, section: SectionRef): string {
+	return text.slice(section.bodyStart, section.bodyEnd ?? undefined).trim();
+}

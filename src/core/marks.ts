@@ -12,30 +12,44 @@ interface Span {
  * Find every mark in `text`. A mark never spans a newline, and marks don't
  * nest: the innermost `{{` before a `}}` wins, so `{{a {{b}}` yields `b`.
  * Marks with an empty target are not marks.
+ *
+ * Jumps between `{{`, `}}` and newlines with `indexOf`, reusing each search
+ * result until the scan passes it, so text without marks costs a few native
+ * scans (see docs/PERFORMANCE.md, P5).
  */
 export function parseMarks(text: string): MarkRange[] {
 	const marks: MarkRange[] = [];
 	let open = -1;
-	let i = 0;
-	while (i < text.length - 1) {
-		if (text[i] === '\n') {
+	let pos = 0;
+	let nextOpen = text.indexOf(OPEN);
+	let nextClose = text.indexOf(CLOSE);
+	let nextLine = text.indexOf('\n');
+
+	while (nextOpen !== -1 || nextClose !== -1) {
+		const at = Math.min(orEnd(nextOpen, text), orEnd(nextClose, text), orEnd(nextLine, text));
+		if (at === nextLine) {
 			open = -1;
-			i += 1;
-		} else if (text.startsWith(OPEN, i)) {
+			pos = at + 1;
+		} else if (at === nextOpen) {
 			// Step by one so `{{{` opens at the last pair.
-			open = i;
-			i += 1;
-		} else if (open !== -1 && text.startsWith(CLOSE, i)) {
-			const mark = toMark(text, open, i + CLOSE.length);
-			if (mark) marks.push(mark);
-			open = -1;
-			i += CLOSE.length;
+			open = at;
+			pos = at + 1;
 		} else {
-			i += 1;
+			if (open !== -1) {
+				const mark = toMark(text, open, at + CLOSE.length);
+				if (mark) marks.push(mark);
+			}
+			open = -1;
+			pos = at + CLOSE.length;
 		}
+		if (nextOpen !== -1 && nextOpen < pos) nextOpen = text.indexOf(OPEN, pos);
+		if (nextClose !== -1 && nextClose < pos) nextClose = text.indexOf(CLOSE, pos);
+		if (nextLine !== -1 && nextLine < pos) nextLine = text.indexOf('\n', pos);
 	}
 	return marks;
 }
+
+const orEnd = (index: number, text: string): number => (index === -1 ? text.length : index);
 
 function toMark(text: string, from: number, to: number): MarkRange | null {
 	const innerFrom = from + OPEN.length;

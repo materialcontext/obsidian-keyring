@@ -1,6 +1,8 @@
 import { Notice, Plugin } from 'obsidian';
 import { stats } from './core/termIndex';
+import { registerHover } from './obsidian/hover';
 import { createIndexer, type Indexer } from './obsidian/indexer';
+import { markPostProcessor } from './obsidian/readingView';
 import { DEFAULT_SETTINGS, type KeyringSettings } from './settings';
 
 export default class KeyringPlugin extends Plugin {
@@ -9,7 +11,11 @@ export default class KeyringPlugin extends Plugin {
 
 	override async onload(): Promise<void> {
 		await this.loadSettings();
-		this.indexer = createIndexer(this.app, this, () => this.settings);
+		const getSettings = () => this.settings;
+
+		this.indexer = createIndexer(this.app, this, getSettings);
+		this.registerMarkdownPostProcessor(markPostProcessor(getSettings));
+		registerHover(this, this.indexer, getSettings);
 
 		this.addCommand({
 			id: 'dump-index-stats',

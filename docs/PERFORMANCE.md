@@ -142,7 +142,7 @@ These cost nothing extra if adopted while milestones 4 and 5 are written:
   - Do the lookup and start `cachedRead` _during_ the hover delay, so content is ready when the delay ends.
   - Render entries lazily as they scroll into view (`IntersectionObserver`).
   - Cap the first render, e.g. 20 entries plus a "Show N more" control.
-- **Memoization:** cache `normalizeKey` results for mark targets.
+- **Memoization:** ~~cache `normalizeKey` results for mark targets~~. Dropped in milestone 4: a hover normalizes one target (~170 ns) at most once per hover delay, so a cache would save nothing measurable. Reconsider for the unresolved-mark stretch goal, which would look up every visible mark on each editor update.
 - **Steady state:** don't allocate in per-keystroke code where avoidable.
 
 ### 4.5 Considered and rejected
@@ -169,7 +169,7 @@ These are targets for plugin-owned work, measured at **p99**. The low-end column
 
 **Phase 0 (this PR).** This document, plus the benchmark harness (`bench/`).
 
-**Phase 1 (fold into milestones 4 and 5).** The §4.4 rules: `indexOf` scanner, line-incremental Live Preview, the Reading view check, hover prefetch, lazy rendering with a cap of ~20 entries plus "Show N more" (accepted), and target memoization. Also presorted postings (P4), a small, contained change to `termIndex`.
+**Phase 1 (fold into milestones 4 and 5).** _Milestone 4 delivered the `indexOf` scanner, presorted postings, the Reading view check, prefetch during the hover delay, lazy bodies and the cap. Measured: hover ordering of 1000 entries 267 → 7.7 µs; `parseMarks` 8 KB 55 → 4.7 µs, 100 KB 690 → 56 µs, 100 KB without marks 675 → 2.1 µs. Line-incremental Live Preview remains for milestone 5._ The §4.4 rules: `indexOf` scanner, line-incremental Live Preview, the Reading view check, hover prefetch, lazy rendering with a cap of ~20 entries plus "Show N more" (accepted), and target memoization. Also presorted postings (P4), a small, contained change to `termIndex`.
 
 - _Exit:_ the hover and keystroke rows of §5 are met on desktop.
 
