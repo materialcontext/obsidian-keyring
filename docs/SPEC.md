@@ -41,7 +41,7 @@ src/
   core/                NO imports from 'obsidian'. Pure, unit-tested.
     normalize.ts       normalizeKey(text, {caseSensitive}) -> Key
     marks.ts           parseMarks(text) -> MarkRange[]
-    sections.ts        sectionsFromHeadings(headings) -> SectionRef[]
+    sections.ts        sectionsFromHeadings(path, headings) -> SectionRef[]
     termIndex.ts       Immutable index + pure update functions
     order.ts           orderEntries(entries, currentPath) -> entries
     types.ts           Shared core types
@@ -65,10 +65,14 @@ interface SectionRef {
   bodyStart: number;          // heading line end offset
   bodyEnd: number | null;     // next qualifying heading start, null = EOF
 }
-interface MarkRange { from: number; to: number; target: string; display: string }
+interface MarkRange {
+  from: number; to: number;   // whole mark, braces included
+  target: string; display: string;
+  displayFrom: number; displayTo: number;  // visible text; Live Preview hides the rest
+}
 ```
 
-`TermIndex` holds two maps:
+`TermIndex` holds its `NormalizeOptions` (so `lookup(index, target)` and updates normalize identically) and two maps:
 
 - `Map<Key, SectionRef[]>` for lookups.
 - `Map<path, Key[]>` so a single file can be removed or replaced cheaply.
