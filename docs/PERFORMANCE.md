@@ -2,7 +2,7 @@
 
 Status: plan only. Nothing here is implemented yet except the benchmark harness (`npm run bench`, `npm run bench:memory`).
 
-This document explains what limits Keyring's speed and memory use, which limits we can move and which we can't, what we measured, and a phased plan for an overhaul. The overhaul targets resource-strained environments (low-end laptops, huge vaults, possibly mobile later) and microsecond-scale response where that is physically possible.
+This document explains what limits Keyring's speed and memory use, which limits we can move and which we can't, what we measured, and a phased plan for an overhaul. The overhaul targets resource-strained environments (low-end desktops and laptops, and huge vaults; mobile is not a target) and microsecond-scale response where that is physically possible.
 
 ## 1. What "microsecond response" can and cannot mean
 
@@ -57,7 +57,7 @@ Machine: Intel Xeon @ 2.1 GHz, Node 22 (V8 12.4). Synthetic vault: 5 headings pe
 
 ### P2. Memory: ~420 bytes per section
 
-Each section is a JS object, plus a key string, plus per-key arrays, plus two `Map` entries. That's acceptable on desktop at 10k notes. It's not acceptable on mobile or at 250k sections (100 MB). In a real vault part of this is shared with `metadataCache` (the heading strings), but the structural overhead remains.
+Each section is a JS object, plus a key string, plus per-key arrays, plus two `Map` entries. That's acceptable at 10k notes (~21 MB at 5 headings per note). At 100k notes it becomes roughly 200 MB, which is a real cost even on desktop. In a real vault part of this is shared with `metadataCache` (the heading strings), but the structural overhead remains.
 
 ### P3. V8 `Map` deletes are expensive
 
@@ -120,7 +120,7 @@ Replace the `SectionRef` objects with struct-of-arrays storage:
 - **Posting lists:** a section-id list per key, kept presorted by path (P4).
 - **Hover:** materializes `SectionRef` views only for the entries it renders.
 
-The target is **≤ 64 B per section**, about 16 MB at 250k sections. This is the most invasive change. Only do it if memory targets demand it, e.g. mobile.
+The target is **≤ 64 B per section**, about 16 MB at 250k sections. This is the most invasive change. Whether it's needed is decided by the 10k vs 100k comparison (§7).
 
 ### 4.3 Time-sliced work (fixes P6)
 
@@ -153,9 +153,9 @@ These cost nothing extra if adopted while milestones 4 and 5 are written:
 
 ## 5. Budgets by environment
 
-These are targets for plugin-owned work, measured at **p99**. The low-end column is the desktop budget after the assumed slowdown in §2, until real measurements replace it.
+These are targets for plugin-owned work, measured at **p99**. The low-end column is the desktop budget after the assumed slowdown in §2, until real measurements replace it. Mobile is not a target.
 
-| Path                                        | Desktop                                   | Low-end / mobile |
+| Path                                        | Desktop                                   | Low-end desktop  |
 | ------------------------------------------- | ----------------------------------------- | ---------------- |
 | Hover: lookup + order (≤ 1000 entries)      | ≤ 10 µs                                   | ≤ 100 µs         |
 | Hover: content ready once the delay elapses | prefetched; first entry in the next frame | same             |
@@ -169,7 +169,7 @@ These are targets for plugin-owned work, measured at **p99**. The low-end column
 
 **Phase 0 (this PR).** This document, plus the benchmark harness (`bench/`).
 
-**Phase 1 (fold into milestones 4 and 5).** The §4.4 rules: `indexOf` scanner, line-incremental Live Preview, the Reading view check, hover prefetch, lazy rendering with a cap, and target memoization. Also presorted postings (P4), a small, contained change to `termIndex`.
+**Phase 1 (fold into milestones 4 and 5).** The §4.4 rules: `indexOf` scanner, line-incremental Live Preview, the Reading view check, hover prefetch, lazy rendering with a cap of ~20 entries plus "Show N more" (accepted), and target memoization. Also presorted postings (P4), a small, contained change to `termIndex`.
 
 - _Exit:_ the hover and keystroke rows of §5 are met on desktop.
 
@@ -177,7 +177,7 @@ These are targets for plugin-owned work, measured at **p99**. The low-end column
 
 - _Exit:_ one-file edit ≤ 20 µs at 50k files; no main-thread block > 4 ms during startup.
 
-**Phase 3 (memory, only if targets require it).** Columnar storage and interning (§4.2).
+**Phase 3 (memory, only if the 10k vs 100k comparison shows it's needed).** Columnar storage and interning (§4.2).
 
 - _Exit:_ ≤ 64 B per section in `npm run bench:memory`.
 
@@ -188,14 +188,22 @@ These are targets for plugin-owned work, measured at **p99**. The low-end column
 - **Node benchmarks:** `npm run bench` and `npm run bench:memory` give quick feedback in development. Record before/after numbers in each performance PR.
 - **In Obsidian:** add a debug command that runs the same micro-benchmarks inside Electron's V8. Node's V8 differs, and P3 shows version-specific behavior matters.
   - `performance.now()` is coarsened in the renderer, so time batches of thousands of iterations and divide.
-- **Low-end simulation:** use DevTools CPU throttling (4×, 6×) inside Obsidian. Use a real low-end device once one is a target.
+- **Low-end simulation:** use DevTools CPU throttling (4×, 6×) inside Obsidian. Confirm on a real low-end laptop.
+- **10k vs 100k comparison:** run every path at both vault sizes and report the results side by side, with the ratio between them. A path that scales worse than linearly shows up immediately. Run it at the start of the overhaul as the baseline, and again at the end of each phase.
+  - _Node:_ `npm run bench` and `npm run bench:memory` gain 10k and 100k fixtures. Paths: build, one-file edit, lookup, ordering of a popular term, and retained memory.
+  - _Obsidian:_ a script generates a synthetic 100k-note vault, ignored by git. Measure startup (performance trace, longest Keyring task), time to a complete index, and heap after a full build, compared with a 10k vault.
 - **Percentiles:** report p50 and p99, not just medians. GC and JIT effects only show up in the tail.
 - **Startup:** record a performance trace of startup with a large synthetic vault, and confirm no long tasks > 50 ms come from Keyring.
 - **CI:** don't gate on timings. Shared runners are too noisy. If gating is wanted later, compare against a baseline run on the same machine, with relative thresholds.
 
-## 8. Open questions
+## 8. Decisions and open questions
+
+Decided:
+
+- **Environments:** desktop only. There's no mobile target, so the manifest stays `isDesktopOnly`, and Phase 3 is driven only by vault size.
+- **Popover cap:** accepted. Render about 20 entries first, with a "Show N more" control.
+- **Vault size:** compare 10k vs 100k notes when the overhaul starts (§7). The result decides whether Phase 3 is needed.
+
+Open:
 
 1. **Which interactions need microseconds?** Is it the plugin's own work per interaction (achievable, §5), or something stricter? Pixels on screen can't be under one frame.
-2. **Which environments are targets?** Mobile changes the priorities. Phase 3 (memory) becomes mandatory, and the manifest is desktop-only today.
-3. **Largest vault to support:** 10k notes? 100k? This sets whether Phase 3 is needed.
-4. **Popover entry cap:** is a cap with "Show more" acceptable UX, or must every entry render at once?
