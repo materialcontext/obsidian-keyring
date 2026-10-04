@@ -166,6 +166,14 @@ Work one milestone at a time. Stop at the end of each for review.
 6. **Settings + polish.**
    - Add the settings tab, excluded folders, and the no-match message.
    - Write a README covering the syntax and its limitations.
+7. **Final review.**
+   - Review the whole codebase for stylistic and architectural consistency:
+     - naming, module boundaries and the one-way `obsidian/` → `core/` direction
+     - comment density, error handling and DOM/API usage, which should match across modules
+     - docs (`SPEC.md`, `PERFORMANCE.md`, README, `CLAUDE.md`) agreeing with the code
+   - Hunt for dead code: unused exports, helpers, settings, CSS classes and stale comments.
+   - Hunt for bugs, including edge cases the tests don't cover.
+   - *Done when:* every finding is fixed or recorded with a reason, and build, tests, lint and format all pass.
 
 **Stretch (only if asked):**
 - Unresolved-mark styling.
