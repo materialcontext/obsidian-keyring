@@ -16,6 +16,7 @@ A **section** is the content under a heading, up to the next heading of equal or
   - No newlines inside a mark.
   - Marks don't nest.
   - Marks spanning formatting boundaries (`{{**bold**}}`) are not supported in Reading view. Document this limitation; don't engineer around it.
+  - Inside a Markdown table, `|` splits cells, so the `{{target|display}}` form breaks there (as with wikilinks). Document it alongside the formatting limitation.
 - **Normalization:** a heading and a target match when their normalized keys are equal.
   - Normalizing removes all whitespace.
   - It case-folds by default; case sensitivity is a setting.
@@ -44,13 +45,16 @@ src/
     sections.ts        sectionsFromHeadings(path, headings) -> SectionRef[]
     termIndex.ts       Immutable index + pure update functions
     paths.ts           Excluded-folder rules, rename -> IndexOp
-    order.ts           orderEntries(entries, currentPath) -> entries
+    order.ts           compareSections; orderEntries(sorted, currentPath) hoists the current file
+    chain.ts           nextChain(parent, key, maxDepth) -> chain | null (cycle guard)
     types.ts           Shared core types
   obsidian/
     indexer.ts         Builds/maintains TermIndex from metadataCache + vault events
     readingView.ts     MarkdownPostProcessor that wraps marks in spans
     livePreview.ts     CM6 ViewPlugin: mark decorations + brace hiding
-    hover.ts           Single hover controller + popover rendering
+    hover.ts           Single hover controller
+    popover.ts         Popover content: entries, cap, lazy bodies
+    dom.ts             Shared class/attribute names, DOM helpers
 styles.css
 tests/                 vitest, core only
 ```
@@ -99,7 +103,7 @@ The index stores offsets only. Section text is read lazily at hover time via `va
 - `registerMarkdownPostProcessor`.
 - Walk text nodes with a `TreeWalker`, skipping anything inside `code`, `pre`, `a`, `.math`, or an existing mark span.
 - Run `parseMarks` on each text node and split it into text plus mark spans.
-- Each mark becomes `<span class="hh-mark" data-hh-target="…" data-hh-source="ctx.sourcePath">display</span>`.
+- Each mark becomes `<span class="keyring-mark" data-keyring-target="…" data-keyring-source="ctx.sourcePath">display</span>`.
 - Because popover content is rendered with `MarkdownRenderer.render`, this same post-processor makes marks inside popovers live. That is how nested popovers work, with no extra code.
 
 **Live Preview**
@@ -111,13 +115,14 @@ The index stores offsets only. Section text is read lazily at hover time via `va
 - Recompute on `docChanged`, `viewportChanged` and `selectionSet`.
 
 **Hover controller**
-- A single delegated `mouseover`/`mouseout` handler, registered with `registerDomEvent(document, …)`, catches `.hh-mark` from both modes and from inside popovers. There is no per-element wiring.
+- A single delegated `mouseover` handler, registered with `registerDomEvent` on each window's document (main window, plus `window-open` for popouts), catches `.keyring-mark` from both modes and from inside popovers. There is no per-element wiring. No `mouseout` handler is needed: `HoverPopover` attaches its own listeners to the target element.
 - It uses `HoverPopover` from `obsidian`. This API is only partly documented, so **check the actual signatures in `node_modules/obsidian/obsidian.d.ts`** before relying on anything. Each popover gets its own `HoverParent` object so nesting works.
-- Hover delay is a setting (default 300 ms).
+- Hover delay is a setting (default 300 ms). It is passed as `HoverPopover`'s `waitTime`. The popover is created on `mouseover` and its content renders during the delay, so it's ready when the popover shows.
 - Popover content contains one block per entry:
   - A clickable source label: `basename › Heading`. Clicking it opens the file at that heading via `workspace.openLinkText(path + '#' + heading, sourcePath)`.
   - The body, rendered with `MarkdownRenderer.render(app, body, el, entry.path, popover)`. **Render each entry separately, with its own `sourcePath`**, so relative links and embeds resolve correctly. Never concatenate the markdown first.
-- Cycle guard: track the chain of open targets per root popover. If the hovered key is already in the chain or depth ≥ max, do nothing.
+- Cycle guard: each popover carries its chain of open keys in a `data-keyring-chain` attribute. A hovered mark reads the chain from its closest enclosing popover (none means a root popover) and `nextChain` refuses a key already in the chain or a chain already at max depth. Keeping the chain in the DOM means no bookkeeping when popovers close; that matters because a popover cancelled before it shows never loads or unloads.
+- Entries: the first 20 render, plus a "Show N more" control. The first 3 bodies render eagerly during the hover delay; the rest render as they scroll into view.
 - Styling: CSS gives the popover a `max-height` with overflow scroll, a separator between entries, and a subtle dotted underline on `.hh-mark`. Use theme variables only.
 
 ## Settings

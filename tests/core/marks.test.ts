@@ -91,3 +91,50 @@ describe('parseMarks', () => {
 		}
 	});
 });
+
+/** The original per-character scanner, kept as an executable specification. */
+function referenceParse(text: string): [number, number][] {
+	const spans: [number, number][] = [];
+	let open = -1;
+	let i = 0;
+	while (i < text.length - 1) {
+		if (text[i] === '\n') {
+			open = -1;
+			i += 1;
+		} else if (text.startsWith('{{', i)) {
+			open = i;
+			i += 1;
+		} else if (open !== -1 && text.startsWith('}}', i)) {
+			const inner = text.slice(open + 2, i);
+			const target = inner.split('|')[0] ?? '';
+			if (target.trim() !== '') spans.push([open, i + 2]);
+			open = -1;
+			i += 2;
+		} else {
+			i += 1;
+		}
+	}
+	return spans;
+}
+
+function seeded(seed: number): () => number {
+	return () => {
+		seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+		return seed / 2 ** 32;
+	};
+}
+
+describe('parseMarks agrees with the reference scanner', () => {
+	it('on 5000 random strings over { } | a space newline', () => {
+		const random = seeded(42);
+		const alphabet = ['{', '}', '|', 'a', ' ', '\n'];
+		for (let n = 0; n < 5000; n++) {
+			const length = Math.floor(random() * 40);
+			let text = '';
+			for (let i = 0; i < length; i++)
+				text += alphabet[Math.floor(random() * alphabet.length)];
+			const spans = parseMarks(text).map((m): [number, number] => [m.from, m.to]);
+			expect(spans, JSON.stringify(text)).toEqual(referenceParse(text));
+		}
+	});
+});

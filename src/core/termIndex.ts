@@ -1,10 +1,12 @@
 import { normalizeKey, type NormalizeOptions } from './normalize';
+import { compareSections } from './order';
 import type { Key, SectionRef } from './types';
 
 /**
  * Immutable lookup from key to sections, plus the reverse map from path to
  * keys so one file can be replaced or removed without scanning everything.
- * Every update returns a new index and leaves its input untouched.
+ * Every update returns a new index and leaves its input untouched. Each key's
+ * sections are kept sorted by `compareSections`.
  */
 export interface TermIndex {
 	readonly options: NormalizeOptions;
@@ -35,6 +37,7 @@ export function emptyIndex(options: NormalizeOptions): TermIndex {
 	return { options, byKey: new Map(), byPath: new Map() };
 }
 
+/** Sections whose heading matches `target`, sorted by `compareSections`. */
 export function lookup(index: TermIndex, target: string): readonly SectionRef[] {
 	return index.byKey.get(normalizeKey(target, index.options)) ?? [];
 }
@@ -107,7 +110,7 @@ function setFile(
 		// An empty key can never be looked up: marks with empty targets aren't parsed.
 		if (key === '') continue;
 		keys.add(key);
-		draft.byKey.set(key, [...(draft.byKey.get(key) ?? []), section]);
+		draft.byKey.set(key, insertSorted(draft.byKey.get(key) ?? [], section));
 	}
 	draft.byPath.set(path, [...keys]);
 }
@@ -125,11 +128,25 @@ function renameFile(draft: Draft, from: string, to: string): void {
 	const keys = draft.byPath.get(from) ?? [];
 	removeFile(draft, to);
 	for (const key of keys) {
-		const moved = (draft.byKey.get(key) ?? []).map((s) =>
-			s.path === from ? { ...s, path: to } : s,
-		);
-		draft.byKey.set(key, moved);
+		const list = draft.byKey.get(key) ?? [];
+		// The new path can sort elsewhere, so moved sections are re-inserted.
+		let next = list.filter((s) => s.path !== from);
+		for (const s of list) if (s.path === from) next = insertSorted(next, { ...s, path: to });
+		draft.byKey.set(key, next);
 	}
 	draft.byPath.delete(from);
 	draft.byPath.set(to, keys);
+}
+
+/** A copy of `list` (sorted by `compareSections`) with `section` inserted in order. */
+function insertSorted(list: readonly SectionRef[], section: SectionRef): SectionRef[] {
+	let lo = 0;
+	let hi = list.length;
+	while (lo < hi) {
+		const mid = (lo + hi) >>> 1;
+		const probe = list[mid];
+		if (probe !== undefined && compareSections(probe, section) <= 0) lo = mid + 1;
+		else hi = mid;
+	}
+	return [...list.slice(0, lo), section, ...list.slice(lo)];
 }

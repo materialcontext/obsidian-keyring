@@ -9,6 +9,7 @@ import {
 	withoutFile,
 	type TermIndex,
 } from '../../src/core/termIndex';
+import { compareSections } from '../../src/core/order';
 import { section } from '../helpers';
 
 const folded = { caseSensitive: false };
@@ -104,7 +105,7 @@ describe('termIndex', () => {
 		it('moves sections and the path entry', () => {
 			const before = indexOf({ 'old.md': ['Term', 'Other'], 'b.md': ['Term'] });
 			const after = renamed(before, 'old.md', 'dir/new.md');
-			expect(paths(after, 'term')).toEqual(['dir/new.md', 'b.md']);
+			expect(paths(after, 'term')).toEqual(['b.md', 'dir/new.md']);
 			expect(paths(after, 'other')).toEqual(['dir/new.md']);
 			expect(after.byPath.has('old.md')).toBe(false);
 			expect(after.byPath.get('dir/new.md')).toEqual(['term', 'other']);
@@ -196,6 +197,55 @@ describe('termIndex', () => {
 			]);
 			expect(paths(before, 'term')).toEqual(['a.md']);
 			expect([...before.byPath.keys()]).toEqual(['a.md']);
+		});
+	});
+
+	describe('sorted postings', () => {
+		const isSorted = (index: TermIndex) =>
+			[...index.byKey.values()].every((list) =>
+				list.every((s, i) => i === 0 || compareSections(list[i - 1]!, s) <= 0),
+			);
+
+		it('lookup returns sections by path, then position, whatever the insert order', () => {
+			const index = indexOf({ 'z.md': ['T', 'T'], 'a.md': ['T'], 'm.md': ['T'] });
+			expect(lookup(index, 't').map((s) => `${s.path}@${s.bodyStart}`)).toEqual([
+				'a.md@0',
+				'm.md@0',
+				'z.md@0',
+				'z.md@10',
+			]);
+		});
+
+		it('rename moves sections to their new sort position', () => {
+			const before = indexOf({ 'a.md': ['T'], 'm.md': ['T'], 'z.md': ['T'] });
+			const after = renamed(before, 'a.md', 'q.md');
+			expect(paths(after, 't')).toEqual(['m.md', 'q.md', 'z.md']);
+		});
+
+		it('stays sorted through a random sequence of ops', () => {
+			let seed = 7;
+			const random = (n: number) => {
+				seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+				return seed % n;
+			};
+			const names = ['a.md', 'B.md', 'c/d.md', 'é.md', 'z.md', 'm.md'];
+			let index = emptyIndex(folded);
+			for (let step = 0; step < 500; step++) {
+				const path = names[random(names.length)]!;
+				const roll = random(3);
+				if (roll === 0) {
+					const count = random(4);
+					const sections = Array.from({ length: count }, (_, i) =>
+						section(path, ['T', 'U'][random(2)]!, (random(5) + i) * 10),
+					);
+					index = withFile(index, path, sections);
+				} else if (roll === 1) {
+					index = withoutFile(index, path);
+				} else {
+					index = renamed(index, path, names[random(names.length)]!);
+				}
+				expect(isSorted(index)).toBe(true);
+			}
 		});
 	});
 });

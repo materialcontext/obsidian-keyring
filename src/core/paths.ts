@@ -19,8 +19,12 @@ export function isUnder(path: string, folder: string): boolean {
 	return folder === '' || path === folder || path.startsWith(`${folder}/`);
 }
 
+export function isExcluded(path: string, rules: PathRules): boolean {
+	return rules.excludedFolders.some((folder) => isUnder(path, folder));
+}
+
 export function isIndexable(path: string, rules: PathRules): boolean {
-	return path.endsWith('.md') && !rules.excludedFolders.some((folder) => isUnder(path, folder));
+	return path.endsWith('.md') && !isExcluded(path, rules);
 }
 
 /** `path` moved from under `fromFolder` to under `toFolder`. */
@@ -42,4 +46,10 @@ export function opForRename(
 	if (!isIndexable(newPath, rules)) return { kind: 'remove', path: oldPath };
 	if (isIndexable(oldPath, rules)) return { kind: 'rename', from: oldPath, to: newPath };
 	return { kind: 'set', path: newPath, sections: sectionsAt(newPath) };
+}
+
+/** File name without folder or `.md` extension, as Obsidian shows it. */
+export function basename(path: string): string {
+	const name = path.slice(path.lastIndexOf('/') + 1);
+	return name.endsWith('.md') ? name.slice(0, -'.md'.length) : name;
 }
