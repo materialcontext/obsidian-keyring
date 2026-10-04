@@ -1,0 +1,3 @@
+// sectionsFromHeadings(headings) -> SectionRef[]
+
+export {};

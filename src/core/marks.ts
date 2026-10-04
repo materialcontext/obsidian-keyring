@@ -1,0 +1,3 @@
+// parseMarks(text) -> MarkRange[]
+
+export {};
