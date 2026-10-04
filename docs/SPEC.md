@@ -43,6 +43,7 @@ src/
     marks.ts           parseMarks(text) -> MarkRange[]
     sections.ts        sectionsFromHeadings(path, headings) -> SectionRef[]
     termIndex.ts       Immutable index + pure update functions
+    paths.ts           Excluded-folder rules, rename -> IndexOp
     order.ts           orderEntries(entries, currentPath) -> entries
     types.ts           Shared core types
   obsidian/
@@ -78,6 +79,8 @@ interface MarkRange {
 - `Map<path, Key[]>` so a single file can be removed or replaced cheaply.
 
 Index updates are pure functions: `withFile(index, path, sections)`, `withoutFile(index, path)` and `renamed(index, oldPath, newPath)`, each returning a new index. The indexer owns the single mutable reference.
+
+Updates are also data: `IndexOp` is `set | remove | rename`, and `applyOps(index, ops)` applies a batch with at most one copy of the maps. The three functions above are one-op wrappers. The indexer queues ops from vault events and flushes them on a 100 ms debounce, and `current()` flushes first so reads are never stale. Without batching, building 10k files one at a time took ~47 s (each update copies the map); batched it takes ~75 ms.
 
 The index stores offsets only. Section text is read lazily at hover time via `vault.cachedRead(file).slice(bodyStart, bodyEnd ?? undefined).trim()`. The initial build needs no file reads, since `metadataCache` headings are enough.
 

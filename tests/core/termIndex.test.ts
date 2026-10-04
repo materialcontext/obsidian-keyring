@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+	applyOps,
 	emptyIndex,
 	lookup,
 	renamed,
@@ -140,5 +141,61 @@ describe('termIndex', () => {
 	it('stats counts keys, files and sections', () => {
 		const index = indexOf({ 'a.md': ['X', 'Y', 'x'], 'b.md': ['Y'] });
 		expect(stats(index)).toEqual({ keys: 2, files: 2, sections: 4 });
+	});
+
+	describe('applyOps', () => {
+		it('applies ops in order', () => {
+			const index = applyOps(emptyIndex(folded), [
+				{ kind: 'set', path: 'a.md', sections: [section('a.md', 'Term')] },
+				{ kind: 'rename', from: 'a.md', to: 'b.md' },
+				{ kind: 'set', path: 'c.md', sections: [section('c.md', 'Term')] },
+				{ kind: 'remove', path: 'c.md' },
+			]);
+			expect(paths(index, 'term')).toEqual(['b.md']);
+			expect([...index.byPath.keys()]).toEqual(['b.md']);
+		});
+
+		it('matches applying the same ops one at a time', () => {
+			const start = indexOf({ 'a.md': ['X', 'Y'], 'b.md': ['Y'] });
+			const batched = applyOps(start, [
+				{ kind: 'rename', from: 'a.md', to: 'z.md' },
+				{ kind: 'set', path: 'b.md', sections: [section('b.md', 'X')] },
+				{ kind: 'remove', path: 'missing.md' },
+			]);
+			const stepwise = withFile(renamed(start, 'a.md', 'z.md'), 'b.md', [
+				section('b.md', 'X'),
+			]);
+			expect(batched.byKey).toEqual(stepwise.byKey);
+			expect(batched.byPath).toEqual(stepwise.byPath);
+		});
+
+		it('returns the same index when nothing changes', () => {
+			const before = indexOf({ 'a.md': ['Term'] });
+			expect(applyOps(before, [])).toBe(before);
+			expect(
+				applyOps(before, [
+					{ kind: 'remove', path: 'missing.md' },
+					{ kind: 'rename', from: 'missing.md', to: 'x.md' },
+				]),
+			).toBe(before);
+		});
+
+		it('sees earlier ops in the same batch', () => {
+			const index = applyOps(emptyIndex(folded), [
+				{ kind: 'set', path: 'new.md', sections: [section('new.md', 'Term')] },
+				{ kind: 'remove', path: 'new.md' },
+			]);
+			expect(stats(index)).toEqual({ keys: 0, files: 0, sections: 0 });
+		});
+
+		it('does not mutate its input', () => {
+			const before = indexOf({ 'a.md': ['Term'] });
+			applyOps(before, [
+				{ kind: 'remove', path: 'a.md' },
+				{ kind: 'set', path: 'b.md', sections: [section('b.md', 'Other')] },
+			]);
+			expect(paths(before, 'term')).toEqual(['a.md']);
+			expect([...before.byPath.keys()]).toEqual(['a.md']);
+		});
 	});
 });
