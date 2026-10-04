@@ -1,0 +1,171 @@
+# Keyring — Obsidian plugin spec
+
+Plugin name: **Keyring** (id: `keyring`). CSS classes and data attributes use the `keyring-` prefix in place of `hh-`.
+
+## What it does
+
+The user marks a term inline with `{{term}}`. Hovering the mark, in Reading view or Live Preview, opens a popover. The popover shows every section in the vault whose heading matches `term`, concatenated into one scrollable popover with a source label for each entry.
+
+A **section** is the content under a heading, up to the next heading of equal or higher priority (heading level number `<=` the current one), or to end of file. The heading line itself is not part of the body; the entry's source label replaces it.
+
+## Decisions already made
+
+- **Language:** TypeScript only. No WASM.
+- **Mark syntax:** `{{target}}` or `{{target|display text}}`.
+  - Target is non-empty.
+  - No newlines inside a mark.
+  - Marks don't nest.
+  - Marks spanning formatting boundaries (`{{**bold**}}`) are not supported in Reading view. Document this limitation; don't engineer around it.
+- **Normalization:** a heading and a target match when their normalized keys are equal.
+  - Normalizing removes all whitespace.
+  - It case-folds by default; case sensitivity is a setting.
+  - Headings with Markdown inside them are matched on their raw text as provided by `metadataCache`. No further stripping in v1.
+- **Nested popovers:** yes. Marks inside a popover are live and open their own popover.
+  - A cycle guard prevents opening a term already open in the current chain.
+  - Nesting depth is capped (setting, default 5).
+- **Ordering inside a popover:**
+  1. Entries from the hovered note's own file first.
+  2. Then by file path, ascending (locale compare).
+  3. Within a file, by position.
+- **No match:** the popover shows a short "No sections titled “X”" message. Stretch goal: style unresolved marks differently, like unresolved links.
+- **Excluded folders** (setting): files there are neither indexed nor scanned for marks. This exists mainly so template folders using `{{date}}`-style placeholders don't light up.
+
+## Architecture
+
+The codebase has a functional, Obsidian-free core and a thin adapter layer. Manageability beats domain purity: keep modules small and the dependency direction one-way (`obsidian/` → `core/`, never the reverse).
+
+```
+src/
+  main.ts              Plugin lifecycle and wiring only. No logic.
+  settings.ts          Settings type, defaults, settings tab.
+  core/                NO imports from 'obsidian'. Pure, unit-tested.
+    normalize.ts       normalizeKey(text, {caseSensitive}) -> Key
+    marks.ts           parseMarks(text) -> MarkRange[]
+    sections.ts        sectionsFromHeadings(headings) -> SectionRef[]
+    termIndex.ts       Immutable index + pure update functions
+    order.ts           orderEntries(entries, currentPath) -> entries
+    types.ts           Shared core types
+  obsidian/
+    indexer.ts         Builds/maintains TermIndex from metadataCache + vault events
+    readingView.ts     MarkdownPostProcessor that wraps marks in spans
+    livePreview.ts     CM6 ViewPlugin: mark decorations + brace hiding
+    hover.ts           Single hover controller + popover rendering
+styles.css
+tests/                 vitest, core only
+```
+
+### Core types (shape, not gospel)
+
+```ts
+type Key = string & { readonly __brand: 'Key' };
+
+interface HeadingInfo { text: string; level: number; startOffset: number; endOffset: number }
+interface SectionRef {
+  path: string; heading: string; level: number;
+  bodyStart: number;          // heading line end offset
+  bodyEnd: number | null;     // next qualifying heading start, null = EOF
+}
+interface MarkRange { from: number; to: number; target: string; display: string }
+```
+
+`TermIndex` holds two maps:
+
+- `Map<Key, SectionRef[]>` for lookups.
+- `Map<path, Key[]>` so a single file can be removed or replaced cheaply.
+
+Index updates are pure functions: `withFile(index, path, sections)`, `withoutFile(index, path)` and `renamed(index, oldPath, newPath)`, each returning a new index. The indexer owns the single mutable reference.
+
+The index stores offsets only. Section text is read lazily at hover time via `vault.cachedRead(file).slice(bodyStart, bodyEnd ?? undefined).trim()`. The initial build needs no file reads, since `metadataCache` headings are enough.
+
+### Obsidian layer
+
+**Indexer**
+- Build on `workspace.onLayoutReady`, from `metadataCache.getFileCache(f)?.headings` for every `vault.getMarkdownFiles()` not in an excluded folder.
+- Keep it current with:
+  - `metadataCache.on('changed')` → replace that file's entries.
+  - `vault.on('delete')` → remove the file.
+  - `vault.on('rename')` → apply `renamed`.
+- Register every listener through `this.registerEvent` so it unloads cleanly.
+- Expose a tiny subscribe/notify so views can refresh when the index changes; the unresolved-mark styling stretch goal needs this.
+
+**Reading view**
+- `registerMarkdownPostProcessor`.
+- Walk text nodes with a `TreeWalker`, skipping anything inside `code`, `pre`, `a`, `.math`, or an existing mark span.
+- Run `parseMarks` on each text node and split it into text plus mark spans.
+- Each mark becomes `<span class="hh-mark" data-hh-target="…" data-hh-source="ctx.sourcePath">display</span>`.
+- Because popover content is rendered with `MarkdownRenderer.render`, this same post-processor makes marks inside popovers live. That is how nested popovers work, with no extra code.
+
+**Live Preview**
+- A CM6 `ViewPlugin` computes decorations over `view.visibleRanges`, using `syntaxTree` to skip code and math nodes.
+- Node names in Obsidian's grammar are not documented. Log them at runtime and skip names containing `code` or `math`, then tighten.
+- Each mark gets `Decoration.mark` with the same class and `data-` attributes as Reading view. Get the source path from `view.state.field(editorInfoField).file`.
+- When the selection does not touch a mark, hide the `{{`, `}}` and the `target|` prefix with `Decoration.replace`, the same way Obsidian hides link syntax. When the cursor is inside, show the raw text.
+- Only hide syntax when `editorLivePreviewField` is true. In Source mode, mark the text but hide nothing.
+- Recompute on `docChanged`, `viewportChanged` and `selectionSet`.
+
+**Hover controller**
+- A single delegated `mouseover`/`mouseout` handler, registered with `registerDomEvent(document, …)`, catches `.hh-mark` from both modes and from inside popovers. There is no per-element wiring.
+- It uses `HoverPopover` from `obsidian`. This API is only partly documented, so **check the actual signatures in `node_modules/obsidian/obsidian.d.ts`** before relying on anything. Each popover gets its own `HoverParent` object so nesting works.
+- Hover delay is a setting (default 300 ms).
+- Popover content contains one block per entry:
+  - A clickable source label: `basename › Heading`. Clicking it opens the file at that heading via `workspace.openLinkText(path + '#' + heading, sourcePath)`.
+  - The body, rendered with `MarkdownRenderer.render(app, body, el, entry.path, popover)`. **Render each entry separately, with its own `sourcePath`**, so relative links and embeds resolve correctly. Never concatenate the markdown first.
+- Cycle guard: track the chain of open targets per root popover. If the hovered key is already in the chain or depth ≥ max, do nothing.
+- Styling: CSS gives the popover a `max-height` with overflow scroll, a separator between entries, and a subtle dotted underline on `.hh-mark`. Use theme variables only.
+
+## Settings
+
+| Setting | Default |
+|---|---|
+| Case-sensitive matching | off |
+| Hover delay (ms) | 300 |
+| Max nesting depth | 5 |
+| Excluded folders (list) | empty |
+
+## Milestones
+
+Work one milestone at a time. Stop at the end of each for review.
+
+1. **Scaffold.**
+   - Start from the official `obsidian-sample-plugin` layout (esbuild).
+   - Add vitest and a strict `tsconfig`.
+   - Create empty modules matching the tree above.
+   - *Done when:* `npm run build` and `npm test` pass, and the plugin loads in a dev vault.
+2. **Core.**
+   - Implement `normalize`, `marks`, `sections`, `termIndex` and `order`, with thorough tests:
+     - Section boundaries across mixed heading levels.
+     - The last section running to EOF.
+     - Duplicate headings in the same file.
+     - The `|display` form.
+     - Adjacent marks, unclosed `{{`, and empty targets.
+     - Whitespace/case normalization.
+     - Rename and remove behavior.
+   - *Done when:* tests are green and `core/` has zero `obsidian` imports.
+3. **Indexer.**
+   - Wire the index to vault events.
+   - Add a debug command, "Dump index stats" (shown as "Keyring: Dump index stats"), that prints key and file counts to the console.
+   - *Done when:* editing, renaming and deleting notes updates the stats correctly.
+4. **Reading view + popover.**
+   - Implement the post-processor, hover controller and popover rendering, including nested popovers and the cycle guard.
+   - *Done when:* hovering a mark in Reading view shows all matching sections in the correct order, with working source labels.
+5. **Live Preview.**
+   - Implement the CM6 extension.
+   - *Done when:* marks highlight and hover in Live Preview, braces hide when the cursor is outside, and marks in code are ignored.
+6. **Settings + polish.**
+   - Add the settings tab, excluded folders, and the no-match message.
+   - Write a README covering the syntax and its limitations.
+
+**Stretch (only if asked):**
+- Unresolved-mark styling.
+- A mobile tap-to-open fallback.
+- An autocomplete for `{{` that suggests indexed headings (`EditorSuggest`).
+- Excluding the section that contains the hovered mark from its own popover.
+
+## Working agreements
+
+- Keep `core/` pure and free of `obsidian` imports. If logic is creeping into `obsidian/`, extract it.
+- Use small modules and plain functions, and prefer immutable data. No classes in `core/` unless clearly warranted.
+- No new runtime dependencies without asking.
+- Verify Obsidian API details against the installed `obsidian.d.ts` rather than memory. Flag anything that relies on undocumented behavior.
+- Clean up everything on unload through `register*` helpers.
+- The user edits in neovim, so don't rely on editor-specific config. Standard `tsconfig`, eslint and prettier are fine.
