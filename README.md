@@ -22,3 +22,7 @@ ln -s "$PWD" /path/to/vault/.obsidian/plugins/keyring
 ```
 
 With `npm run dev` running, reload Obsidian (or use the Hot Reload plugin) to pick up changes.
+
+## License
+
+[MIT](LICENSE)
