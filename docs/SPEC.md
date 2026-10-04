@@ -170,6 +170,8 @@ Work one milestone at a time. Stop at the end of each for review.
 
 ## Working agreements
 
+- Performance limits, budgets and the overhaul plan: see `docs/PERFORMANCE.md`.
+
 - Keep `core/` pure and free of `obsidian` imports. If logic is creeping into `obsidian/`, extract it.
 - Use small modules and plain functions, and prefer immutable data. No classes in `core/` unless clearly warranted.
 - No new runtime dependencies without asking.

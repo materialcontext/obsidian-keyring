@@ -1,12 +1,13 @@
 # Keyring
 
-Obsidian plugin. Design and milestones live in `docs/SPEC.md`. Read it before working.
+Obsidian plugin. Design and milestones live in `docs/SPEC.md`. Read it before working. Performance limits, budgets and the overhaul plan live in `docs/PERFORMANCE.md`; follow its hot-path rules (§4.4) in new code.
 
 ## Commands
 
 - `npm run build`: typecheck and production bundle
 - `npm test`: vitest, core only
 - `npm run lint`, `npm run format:check`
+- `npm run bench`, `npm run bench:memory`: core timings and retained memory (not gated)
 
 All four must pass before pushing (CI runs them).
 
