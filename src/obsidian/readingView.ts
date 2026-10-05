@@ -1,4 +1,4 @@
-import type { MarkdownPostProcessor } from 'obsidian';
+import { type App, type MarkdownPostProcessor, MarkdownView } from 'obsidian';
 import { parseMarks } from '../core/marks';
 import { isExcluded, pathRules } from '../core/paths';
 import type { MarkRange } from '../core/types';
@@ -61,4 +61,11 @@ function splitAround(
 	}
 	if (last < data.length) fragment.append(data.slice(last));
 	return fragment;
+}
+
+/** Re-render every open note's Reading view, e.g. after settings change which notes are scanned. */
+export function rerenderReadingViews(app: App): void {
+	app.workspace.iterateAllLeaves((leaf) => {
+		if (leaf.view instanceof MarkdownView) leaf.view.previewMode.rerender(true);
+	});
 }

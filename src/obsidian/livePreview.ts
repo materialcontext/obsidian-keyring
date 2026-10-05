@@ -1,5 +1,5 @@
 import { syntaxTree } from '@codemirror/language';
-import { type EditorState, type Extension, RangeSetBuilder } from '@codemirror/state';
+import { type EditorState, type Extension, RangeSetBuilder, StateEffect } from '@codemirror/state';
 import {
 	Decoration,
 	type DecorationSet,
@@ -24,6 +24,9 @@ const SKIP_NODE = /code|math|link|url|comment|frontmatter/i;
 
 const hideSyntax = Decoration.replace({});
 
+/** Forces a rescan, e.g. after the excluded folders change. */
+const refreshMarks = StateEffect.define<null>();
+
 interface Scan {
 	readonly marks: readonly MarkRange[];
 	/** One decoration per target, reused so CodeMirror's equality check is an identity hit. */
@@ -34,6 +37,8 @@ export interface LivePreview {
 	readonly extension: Extension;
 	/** Syntax node names at the cursor of the focused (or last opened) editor, innermost first. */
 	describeSyntaxAtCursor(): string[] | null;
+	/** Rescan every open editor, e.g. after settings change which notes are scanned. */
+	refresh(): void;
 }
 
 /**
@@ -59,6 +64,9 @@ export function createLivePreview(
 					const { startState, state } = update;
 					const rescan =
 						update.docChanged ||
+						update.transactions.some((tr) =>
+							tr.effects.some((e) => e.is(refreshMarks)),
+						) ||
 						update.viewportChanged ||
 						syntaxTree(startState) !== syntaxTree(state) ||
 						filePath(startState) !== filePath(state);
@@ -89,6 +97,9 @@ export function createLivePreview(
 			const view = all.find((v) => v.hasFocus) ?? all[all.length - 1];
 			if (!view) return null;
 			return nodeNames(syntaxTree(view.state), view.state.selection.main.head);
+		},
+		refresh() {
+			for (const view of views) view.dispatch({ effects: refreshMarks.of(null) });
 		},
 	};
 }
