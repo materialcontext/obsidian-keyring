@@ -56,7 +56,8 @@ src/
     hover.ts           Single hover controller
     popover.ts         Popover content: entries, cap, lazy bodies
     dom.ts             Shared class/attribute names, DOM helpers
-    settingsTab.ts     PluginSettingTab (classic display(); see the note under Settings)
+    settingsTab.ts     PluginSettingTab via getSettingDefinitions() (Obsidian 1.13+)
+    settingsApplier.ts Batches the reindex/refresh a settings change needs
 styles.css
 tests/                 vitest, core only
 ```
@@ -136,13 +137,15 @@ The index stores offsets only. Section text is read lazily at hover time via `va
 | Max nesting depth | 5 | 1–20 |
 | Excluded folders (list) | empty | one per line |
 
+- **Minimum version:** `minAppVersion` is **1.13.0**, for the declarative settings API. Raised from 1.5.0 before the first release.
+- **The tab** (`getSettingDefinitions()`): a toggle, two `number` controls, and excluded folders as a `list` of `folder` controls with add and delete.
+  - Each folder row binds to the key `excludedFolders.<index>` through `getControlValue`/`setControlValue`.
+  - The framework renders the controls, indexes them for settings search, and shows `validate` errors inline. `rangeError` supplies the messages, and a rejected value isn't saved.
 - **Loading:** `sanitizeSettings` validates settings read from disk field by field. An invalid field falls back to its default.
-- **Invalid input:** the tab marks out-of-range numbers invalid and doesn't save them. The folder list applies 500 ms after typing pauses.
-- **Applying changes:** `settingsImpact` decides what a change needs.
+- **Applying changes:** every change saves immediately. `settingsImpact` decides what the change needs, and `settingsApplier` runs it once, 300 ms after the last change, so typing a folder name rebuilds once.
   - Case sensitivity rebuilds the index.
-  - Excluded folders rebuild the index, rescan open editors (a CodeMirror state effect) and re-render Reading views.
+  - Excluded folders rebuild the index, rescan open editors (a CodeMirror state effect) and re-render Reading views. Folder lists are compared after normalization, so an empty row or a trailing slash changes nothing.
   - Delay and depth are read live.
-- **Settings search:** Obsidian 1.13's declarative `getSettingDefinitions()` API would add this, but `minAppVersion` is 1.5.0. The linter warns about this. Revisit if `minAppVersion` is raised to 1.13.
 
 ## Milestones
 

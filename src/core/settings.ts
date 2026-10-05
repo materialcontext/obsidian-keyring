@@ -1,3 +1,5 @@
+import { pathRules } from './paths';
+
 export interface KeyringSettings {
 	readonly caseSensitive: boolean;
 	readonly hoverDelayMs: number;
@@ -39,18 +41,16 @@ export function sanitizeSettings(raw: unknown): KeyringSettings {
 	};
 }
 
-/** A whole number typed into a settings field, or `null` if it isn't one within `range`. */
-export function parseBoundedInt(text: string, range: IntRange): number | null {
-	const trimmed = text.trim();
-	return /^\d+$/.test(trimmed) ? inRange(Number(trimmed), range) : null;
+/** The message to show for a number outside `range`, or `undefined` when it's valid. */
+export function rangeError(value: unknown, { min, max }: IntRange): string | undefined {
+	return inRange(value, { min, max }) === null
+		? `Enter a whole number from ${min} to ${max}.`
+		: undefined;
 }
 
-/** One folder per line; blank lines and repeats dropped. */
-export function parseFolderList(text: string): string[] {
-	return [...new Set(text.split('\n').map((line) => line.trim()))].filter((line) => line !== '');
-}
-
-export const formatFolderList = (folders: readonly string[]): string => folders.join('\n');
+/** What each part of the folder list contributes to the rules: blank rows and slashes don't count. */
+const effectiveFolders = (folders: readonly string[]): string =>
+	pathRules(folders).excludedFolders.join('\n');
 
 /** What has to happen after settings change. Hover delay and depth are read live and need nothing. */
 export interface SettingsImpact {
@@ -62,8 +62,7 @@ export interface SettingsImpact {
 
 export function settingsImpact(previous: KeyringSettings, next: KeyringSettings): SettingsImpact {
 	const foldersChanged =
-		previous.excludedFolders.length !== next.excludedFolders.length ||
-		previous.excludedFolders.some((folder, i) => folder !== next.excludedFolders[i]);
+		effectiveFolders(previous.excludedFolders) !== effectiveFolders(next.excludedFolders);
 	return {
 		reindex: foldersChanged || previous.caseSensitive !== next.caseSensitive,
 		refreshViews: foldersChanged,

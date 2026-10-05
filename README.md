@@ -4,6 +4,8 @@ Mark a term inline as `{{term}}`. Hovering it opens a popover with every section
 
 Keyring suits glossaries, character and place notes, recurring concepts: any term you define under a heading somewhere and want at hand wherever you mention it.
 
+Requires Obsidian 1.13 or later, on desktop.
+
 ## Usage
 
 Write a mark around a term:
@@ -54,14 +56,14 @@ Marks inside code, math, links and frontmatter are ignored.
 
 ## Settings
 
-| Setting                 | Default |                                                                                                                                                         |
-| ----------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Case-sensitive matching | Off     | Require capitalization to match.                                                                                                                        |
-| Hover delay             | 300 ms  | How long to hover before a popover opens (0–5000).                                                                                                      |
-| Maximum nesting depth   | 5       | How many popovers can open inside each other (1–20).                                                                                                    |
-| Excluded folders        | None    | One folder per line. Notes there are not indexed and their marks are not highlighted. Use this for template folders with `{{date}}`-style placeholders. |
+| Setting                 | Default |                                                                                                                                                                                                           |
+| ----------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Case-sensitive matching | Off     | Require capitalization to match.                                                                                                                                                                          |
+| Hover delay             | 300 ms  | How long to hover before a popover opens (0–5000).                                                                                                                                                        |
+| Maximum nesting depth   | 5       | How many popovers can open inside each other (1–20).                                                                                                                                                      |
+| Excluded folders        | None    | Add folders with **+**; each row offers folder suggestions. Notes in these folders are not indexed and their marks are not highlighted. Use this for template folders with `{{date}}`-style placeholders. |
 
-Changes apply immediately to open notes.
+Changes save immediately and apply to open notes as soon as you stop typing. All settings appear in Obsidian's settings search.
 
 ## Commands
 

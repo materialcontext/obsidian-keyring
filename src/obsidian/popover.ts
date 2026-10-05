@@ -1,4 +1,4 @@
-import { type App, Keymap, MarkdownRenderer, type HoverPopover, TFile } from 'obsidian';
+import { type App, Keymap, MarkdownRenderer, type HoverPopover } from 'obsidian';
 import { basename } from '../core/paths';
 import { sectionBody } from '../core/sections';
 import type { SectionRef } from '../core/types';
@@ -53,8 +53,8 @@ export function renderPopover(
 	popover.register(() => observer.disconnect());
 
 	const renderBody = async (entry: SectionRef, body: HTMLElement): Promise<void> => {
-		const file = app.vault.getAbstractFileByPath(entry.path);
-		if (!(file instanceof TFile)) {
+		const file = app.vault.getFileByPath(entry.path);
+		if (!file) {
 			body.append(el(doc, 'div', 'keyring-note', 'File not found.'));
 			return;
 		}

@@ -10,12 +10,14 @@ import { registerHover } from './obsidian/hover';
 import { createIndexer, type Indexer } from './obsidian/indexer';
 import { createLivePreview, type LivePreview } from './obsidian/livePreview';
 import { markPostProcessor, rerenderReadingViews } from './obsidian/readingView';
+import { createSettingsApplier } from './obsidian/settingsApplier';
 import { KeyringSettingTab } from './obsidian/settingsTab';
 
 export default class KeyringPlugin extends Plugin {
 	override settings: KeyringSettings = DEFAULT_SETTINGS;
 	indexer!: Indexer;
 	livePreview!: LivePreview;
+	private applySettings!: ReturnType<typeof createSettingsApplier>;
 
 	override async onload(): Promise<void> {
 		this.settings = sanitizeSettings(await this.loadData());
@@ -26,6 +28,13 @@ export default class KeyringPlugin extends Plugin {
 		registerHover(this, this.indexer, getSettings);
 		this.livePreview = createLivePreview(getSettings);
 		this.registerEditorExtension(this.livePreview.extension);
+		this.applySettings = createSettingsApplier(this, {
+			reindex: () => this.indexer.rebuild(),
+			refreshViews: () => {
+				this.livePreview.refresh();
+				rerenderReadingViews(this.app);
+			},
+		});
 		this.addSettingTab(
 			new KeyringSettingTab(this.app, this, {
 				settings: getSettings,
@@ -56,17 +65,11 @@ export default class KeyringPlugin extends Plugin {
 		});
 	}
 
-	/** Save a change and apply whatever it requires (settingsImpact decides). */
+	/** Save a change, then apply whatever it requires (settingsImpact decides, the applier batches). */
 	async updateSettings(patch: Partial<KeyringSettings>): Promise<void> {
 		const previous = this.settings;
 		this.settings = { ...previous, ...patch };
 		await this.saveData(this.settings);
-
-		const impact = settingsImpact(previous, this.settings);
-		if (impact.reindex) this.indexer.rebuild();
-		if (impact.refreshViews) {
-			this.livePreview.refresh();
-			rerenderReadingViews(this.app);
-		}
+		this.applySettings(settingsImpact(previous, this.settings));
 	}
 }

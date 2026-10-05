@@ -1,11 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
 	DEFAULT_SETTINGS,
-	formatFolderList,
 	HOVER_DELAY_MS,
 	NESTING_DEPTH,
-	parseBoundedInt,
-	parseFolderList,
+	rangeError,
 	sanitizeSettings,
 	settingsImpact,
 	type KeyringSettings,
@@ -49,32 +47,19 @@ describe('sanitizeSettings', () => {
 	});
 });
 
-describe('parseBoundedInt', () => {
-	it('accepts whole numbers within range, trimmed', () => {
-		expect(parseBoundedInt(' 250 ', HOVER_DELAY_MS)).toBe(250);
-		expect(parseBoundedInt('0', HOVER_DELAY_MS)).toBe(0);
-		expect(parseBoundedInt('20', NESTING_DEPTH)).toBe(20);
+describe('rangeError', () => {
+	it('accepts whole numbers within range', () => {
+		expect(rangeError(0, HOVER_DELAY_MS)).toBeUndefined();
+		expect(rangeError(5000, HOVER_DELAY_MS)).toBeUndefined();
+		expect(rangeError(20, NESTING_DEPTH)).toBeUndefined();
 	});
 
-	it('rejects anything else', () => {
-		for (const text of ['', ' ', '-1', '1.5', '1e3', 'abc', '0x10', '21']) {
-			expect(parseBoundedInt(text, NESTING_DEPTH), text).toBeNull();
+	it('explains anything else', () => {
+		for (const value of [-1, 1.5, 21, 0, NaN, Infinity, null, undefined, '3']) {
+			expect(rangeError(value, NESTING_DEPTH), String(value)).toBe(
+				'Enter a whole number from 1 to 20.',
+			);
 		}
-		expect(parseBoundedInt('0', NESTING_DEPTH)).toBeNull();
-	});
-});
-
-describe('parseFolderList / formatFolderList', () => {
-	it('takes one folder per line, dropping blanks and repeats', () => {
-		expect(parseFolderList('Templates\n\n  Archive/Old  \nTemplates\n')).toEqual([
-			'Templates',
-			'Archive/Old',
-		]);
-	});
-
-	it('round-trips', () => {
-		const folders = ['A', 'B/C'];
-		expect(parseFolderList(formatFolderList(folders))).toEqual(folders);
 	});
 });
 

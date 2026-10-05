@@ -1,19 +1,10 @@
+import { type App, type Plugin, PluginSettingTab, type SettingDefinitionItem } from 'obsidian';
 import {
-	type App,
-	debounce,
-	type Plugin,
-	PluginSettingTab,
-	Setting,
-	type TextComponent,
-} from 'obsidian';
-import {
-	formatFolderList,
+	DEFAULT_SETTINGS,
 	HOVER_DELAY_MS,
-	type IntRange,
 	type KeyringSettings,
 	NESTING_DEPTH,
-	parseBoundedInt,
-	parseFolderList,
+	rangeError,
 } from '../core/settings';
 
 /** What the tab needs from the plugin: the current settings and a way to change them. */
@@ -22,12 +13,13 @@ export interface SettingsHost {
 	readonly update: (patch: Partial<KeyringSettings>) => Promise<void>;
 }
 
-/** How long typing in the folder list pauses before it applies (applying rebuilds the index). */
-const FOLDER_INPUT_DELAY_MS = 500;
+/** List rows bind to `excludedFolders.<index>`; every other key is a settings field. */
+const FOLDER_KEY = /^excludedFolders\.(\d+)$/;
 
-// The declarative getSettingDefinitions() API (settings search) needs Obsidian
-// 1.13; minAppVersion is 1.5.0, so the tab builds its UI in display(). The
-// linter warns about this; revisit when minAppVersion reaches 1.13.
+/**
+ * Declarative settings (Obsidian 1.13+): the framework renders the controls,
+ * indexes them for settings search, and runs `validate` before saving.
+ */
 export class KeyringSettingTab extends PluginSettingTab {
 	constructor(
 		app: App,
@@ -37,77 +29,87 @@ export class KeyringSettingTab extends PluginSettingTab {
 		super(app, plugin);
 	}
 
-	override display(): void {
-		const { containerEl, host } = this;
-		const settings = host.settings();
-		containerEl.empty();
+	override getSettingDefinitions(): SettingDefinitionItem[] {
+		const folders = this.host.settings().excludedFolders;
+		return [
+			{
+				name: 'Case-sensitive matching',
+				desc: 'Match marks to headings only when capitalization agrees. Whitespace is always ignored.',
+				control: { type: 'toggle', key: 'caseSensitive' },
+			},
+			{
+				name: 'Hover delay',
+				desc: `Milliseconds before a popover opens (${HOVER_DELAY_MS.min}–${HOVER_DELAY_MS.max}).`,
+				control: {
+					type: 'number',
+					key: 'hoverDelayMs',
+					...HOVER_DELAY_MS,
+					step: 1,
+					validate: (value) => rangeError(value, HOVER_DELAY_MS),
+				},
+			},
+			{
+				name: 'Maximum nesting depth',
+				desc: `How many popovers can open inside each other (${NESTING_DEPTH.min}–${NESTING_DEPTH.max}).`,
+				control: {
+					type: 'number',
+					key: 'maxNestingDepth',
+					...NESTING_DEPTH,
+					step: 1,
+					validate: (value) => rangeError(value, NESTING_DEPTH),
+				},
+			},
+			{
+				type: 'list',
+				heading: 'Excluded folders',
+				emptyState:
+					'No folders excluded. Notes in an excluded folder are not indexed and their marks ' +
+					'are not highlighted, which keeps template placeholders like {{date}} quiet.',
+				items: folders.map((_, index) => ({
+					name: `Excluded folder ${index + 1}`,
+					aliases: ['exclude', 'ignore', 'templates'],
+					control: {
+						type: 'folder',
+						key: `excludedFolders.${index}`,
+						placeholder: 'Templates',
+					},
+				})),
+				addItem: {
+					name: 'Add folder',
+					action: () => void this.setFolders([...folders, '']),
+				},
+				onDelete: (index) => void this.setFolders(folders.filter((_, i) => i !== index)),
+			},
+		];
+	}
 
-		new Setting(containerEl)
-			.setName('Case-sensitive matching')
-			.setDesc(
-				'Match marks to headings only when capitalization agrees. Whitespace is always ignored.',
-			)
-			.addToggle((toggle) =>
-				toggle
-					.setValue(settings.caseSensitive)
-					.onChange((caseSensitive) => void host.update({ caseSensitive })),
-			);
+	override getControlValue(key: string): unknown {
+		const settings = this.host.settings();
+		const folder = folderIndex(key);
+		if (folder !== null) return settings.excludedFolders[folder] ?? '';
+		return isSettingsKey(key) ? settings[key] : undefined;
+	}
 
-		new Setting(containerEl)
-			.setName('Hover delay')
-			.setDesc(
-				`Milliseconds before a popover opens (${HOVER_DELAY_MS.min}–${HOVER_DELAY_MS.max}).`,
-			)
-			.addText((text) =>
-				numberField(text, settings.hoverDelayMs, HOVER_DELAY_MS, (hoverDelayMs) =>
-					host.update({ hoverDelayMs }),
-				),
-			);
+	override setControlValue(key: string, value: unknown): Promise<void> {
+		const folder = folderIndex(key);
+		if (folder !== null) {
+			const folders = [...this.host.settings().excludedFolders];
+			folders[folder] = typeof value === 'string' ? value : '';
+			return this.host.update({ excludedFolders: folders });
+		}
+		return isSettingsKey(key) ? this.host.update({ [key]: value }) : Promise.resolve();
+	}
 
-		new Setting(containerEl)
-			.setName('Maximum nesting depth')
-			.setDesc(
-				`How many popovers can open inside each other (${NESTING_DEPTH.min}–${NESTING_DEPTH.max}).`,
-			)
-			.addText((text) =>
-				numberField(text, settings.maxNestingDepth, NESTING_DEPTH, (maxNestingDepth) =>
-					host.update({ maxNestingDepth }),
-				),
-			);
-
-		const applyFolders = debounce(
-			(value: string) => void host.update({ excludedFolders: parseFolderList(value) }),
-			FOLDER_INPUT_DELAY_MS,
-			true,
-		);
-		new Setting(containerEl)
-			.setName('Excluded folders')
-			.setDesc(
-				'One folder per line. Notes in these folders are not indexed and their marks are not ' +
-					'highlighted, which keeps template placeholders like {{date}} quiet.',
-			)
-			.addTextArea((area) =>
-				area
-					.setPlaceholder('Templates')
-					.setValue(formatFolderList(settings.excludedFolders))
-					.onChange(applyFolders),
-			);
+	/** Adding or removing a row changes the definitions themselves, so they're rebuilt. */
+	private async setFolders(excludedFolders: string[]): Promise<void> {
+		await this.host.update({ excludedFolders });
+		this.update();
 	}
 }
 
-/** A text field that saves only whole numbers within `range`, and marks anything else invalid. */
-function numberField(
-	text: TextComponent,
-	value: number,
-	range: IntRange,
-	save: (value: number) => Promise<void>,
-): void {
-	text.inputEl.type = 'number';
-	text.inputEl.min = String(range.min);
-	text.inputEl.max = String(range.max);
-	text.setValue(String(value)).onChange((input) => {
-		const parsed = parseBoundedInt(input, range);
-		text.inputEl.classList.toggle('keyring-invalid', parsed === null);
-		if (parsed !== null) void save(parsed);
-	});
+function folderIndex(key: string): number | null {
+	const match = FOLDER_KEY.exec(key);
+	return match ? Number(match[1]) : null;
 }
+
+const isSettingsKey = (key: string): key is keyof KeyringSettings => key in DEFAULT_SETTINGS;
