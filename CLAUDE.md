@@ -11,6 +11,8 @@ Obsidian plugin. Design and milestones live in `docs/SPEC.md`. Read it before wo
 
 All four must pass before pushing (CI runs them).
 
+Releases publish automatically when a merge to `main` changes the version (see README, Releasing). Never hand-edit versions; use `npm version <patch|minor|major> --no-git-tag-version`.
+
 ## Rules
 
 - `src/core/` imports nothing from `obsidian`, `@codemirror/*`, `@lezer/*`, or outside `core/`. ESLint and `tests/core/purity.test.ts` enforce this.
