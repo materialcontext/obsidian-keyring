@@ -74,11 +74,14 @@ export class KeyringSettingTab extends PluginSettingTab {
 						placeholder: 'Templates',
 					},
 				})),
+				// Read the list when clicked: typing into a row saves without rebuilding
+				// these definitions, so `folders` above can be out of date by then.
 				addItem: {
 					name: 'Add folder',
-					action: () => void this.setFolders([...folders, '']),
+					action: () => void this.setFolders([...this.currentFolders(), '']),
 				},
-				onDelete: (index) => void this.setFolders(folders.filter((_, i) => i !== index)),
+				onDelete: (index) =>
+					void this.setFolders(this.currentFolders().filter((_, i) => i !== index)),
 			},
 		];
 	}
@@ -98,6 +101,10 @@ export class KeyringSettingTab extends PluginSettingTab {
 			return this.host.update({ excludedFolders: folders });
 		}
 		return isSettingsKey(key) ? this.host.update({ [key]: value }) : Promise.resolve();
+	}
+
+	private currentFolders(): readonly string[] {
+		return this.host.settings().excludedFolders;
 	}
 
 	/** Adding or removing a row changes the definitions themselves, so they're rebuilt. */

@@ -6,6 +6,27 @@ Keyring suits glossaries, character and place notes, recurring concepts: any ter
 
 Requires Obsidian 1.13 or later, on desktop.
 
+## Installing
+
+Keyring isn't in Obsidian's community plugin directory yet. Install it from this repository's [releases](https://github.com/materialcontext/obsidian-keyring/releases) with either of these:
+
+**With BRAT (recommended, updates automatically)**
+
+1. In Obsidian, install and enable **BRAT** from Settings → Community plugins.
+2. Run **BRAT: Add a beta plugin for testing** from the command palette.
+3. Enter `materialcontext/obsidian-keyring` and confirm.
+4. Enable **Keyring** under Settings → Community plugins.
+
+BRAT checks for new releases and updates Keyring for you.
+
+**Manually**
+
+1. Download `keyring-<version>.zip` from the [latest release](https://github.com/materialcontext/obsidian-keyring/releases/latest).
+2. Unzip it into your vault's `.obsidian/plugins/` folder, so you end up with `.obsidian/plugins/keyring/`. The folder is hidden on macOS and Linux; in Obsidian, Settings → Community plugins → the folder icon opens it.
+3. Reload Obsidian, then enable **Keyring** under Settings → Community plugins.
+
+To update manually, repeat with the newer zip.
+
 ## Usage
 
 Write a mark around a term:
@@ -92,7 +113,7 @@ npm run lint
 npm run format
 ```
 
-To try it in a vault, symlink the repo into the vault's plugin folder, then enable **Keyring** under Settings → Community plugins:
+To try a development build in a vault, symlink the repo into the vault's plugin folder, then enable **Keyring** under Settings → Community plugins:
 
 ```sh
 ln -s "$PWD" /path/to/vault/.obsidian/plugins/keyring
@@ -105,7 +126,7 @@ With `npm run dev` running, reload Obsidian (or use the Hot Reload plugin) to pi
 Releases are cut from `main` by `.github/workflows/release.yml` whenever a push changes the version in `manifest.json`:
 
 1. In a PR, run `npm version <patch|minor|major> --no-git-tag-version`. This updates `package.json`, `manifest.json` and `versions.json` together. Skip the git tag: the workflow creates it.
-2. Merge the PR. The workflow re-runs every check, builds, and publishes a release tagged with the bare version (e.g. `0.2.0`), with `main.js`, `manifest.json` and `styles.css` attached.
+2. Merge the PR. The workflow re-runs every check, builds, and publishes a release tagged with the bare version (e.g. `0.2.0`), with `main.js`, `manifest.json` and `styles.css` attached (what BRAT installs from), plus `keyring-<version>.zip` for manual installs.
 
 `node check-version.mjs` (also run in CI) fails if the three files disagree. To retry a failed release, run the workflow by hand from the Actions tab.
 

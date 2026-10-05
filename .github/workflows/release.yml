@@ -70,6 +70,16 @@ jobs:
           npm run lint
           npm run format:check
 
+      - name: Package for manual install
+        if: steps.plan.outputs.release == 'true'
+        env:
+          VERSION: ${{ steps.plan.outputs.version }}
+        # A zip holding a keyring/ folder: unzip it into <vault>/.obsidian/plugins/.
+        run: |
+          mkdir -p dist/keyring
+          cp main.js manifest.json styles.css dist/keyring/
+          (cd dist && zip -r "../keyring-$VERSION.zip" keyring)
+
       - name: Attest build provenance
         if: steps.plan.outputs.release == 'true'
         uses: actions/attest@v4
@@ -77,6 +87,7 @@ jobs:
           subject-path: |
             main.js
             styles.css
+            keyring-${{ steps.plan.outputs.version }}.zip
 
       - name: Publish release
         if: steps.plan.outputs.release == 'true'
@@ -88,4 +99,4 @@ jobs:
             --target "$GITHUB_SHA" \
             --title "$VERSION" \
             --generate-notes \
-            main.js manifest.json styles.css
+            main.js manifest.json styles.css "keyring-$VERSION.zip"

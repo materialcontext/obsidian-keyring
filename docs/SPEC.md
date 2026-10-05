@@ -126,7 +126,7 @@ The index stores offsets only. Section text is read lazily at hover time via `va
   - The body, rendered with `MarkdownRenderer.render(app, body, el, entry.path, popover)`. **Render each entry separately, with its own `sourcePath`**, so relative links and embeds resolve correctly. Never concatenate the markdown first.
 - Cycle guard: each popover carries its chain of open keys in a `data-keyring-chain` attribute. A hovered mark reads the chain from its closest enclosing popover (none means a root popover) and `nextChain` refuses a key already in the chain or a chain already at max depth. Keeping the chain in the DOM means no bookkeeping when popovers close; that matters because a popover cancelled before it shows never loads or unloads.
 - Entries: the first 20 render, plus a "Show N more" control. The first 3 bodies render eagerly during the hover delay; the rest render as they scroll into view.
-- Styling: CSS gives the popover a `max-height` with overflow scroll, a separator between entries, and a subtle dotted underline on `.hh-mark`. Use theme variables only.
+- Styling: CSS gives the popover a `max-height` with overflow scroll, a separator between entries, and a subtle dotted underline on `.keyring-mark`. Use theme variables only.
 
 ## Settings
 

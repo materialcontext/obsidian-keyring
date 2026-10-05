@@ -7,6 +7,7 @@ Obsidian plugin. Design and milestones live in `docs/SPEC.md`. Read it before wo
 - `npm run build`: typecheck and production bundle
 - `npm test`: vitest, core only
 - `npm run lint`, `npm run format:check`
+- `node check-version.mjs`: package.json, manifest.json and versions.json agree
 - `npm run bench`, `npm run bench:memory`: core timings and retained memory (not gated)
 
 All four must pass before pushing (CI runs them).

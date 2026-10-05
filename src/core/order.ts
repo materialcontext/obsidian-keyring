@@ -7,10 +7,6 @@ export function compareSections(a: Positioned, b: Positioned): number {
 	return a.path.localeCompare(b.path) || a.bodyStart - b.bodyStart;
 }
 
-export function sortSections<T extends Positioned>(entries: readonly T[]): T[] {
-	return [...entries].sort(compareSections);
-}
-
 /**
  * Entries from `currentPath` first, then the rest, each group keeping its
  * order. `entries` must already be sorted by `compareSections`, as `lookup`

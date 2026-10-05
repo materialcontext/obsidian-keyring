@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { compareSections, orderEntries, sortSections } from '../../src/core/order';
+import { compareSections, orderEntries } from '../../src/core/order';
 import { section } from '../helpers';
 
 const labels = (entries: readonly { path: string; bodyStart: number }[]) =>
 	entries.map((e) => `${e.path}@${e.bodyStart}`);
 
-describe('compareSections / sortSections', () => {
+const sortSections = <T extends { path: string; bodyStart: number }>(entries: T[]) =>
+	[...entries].sort(compareSections);
+
+describe('compareSections', () => {
 	it('sorts by path, then by position', () => {
 		const sorted = sortSections([
 			section('b.md', 'T', 50),

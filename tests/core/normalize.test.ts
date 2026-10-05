@@ -10,12 +10,12 @@ describe('normalizeKey', () => {
 	});
 
 	it('case-folds by default', () => {
-		expect(normalizeKey('Heading Hover', folded)).toBe(normalizeKey('heading hover', folded));
+		expect(normalizeKey('Treaty Name', folded)).toBe(normalizeKey('treaty name', folded));
 		expect(normalizeKey('ÉCOLE', folded)).toBe('école');
 	});
 
 	it('keeps case when case-sensitive', () => {
-		expect(normalizeKey('Heading Hover', exact)).toBe('HeadingHover');
+		expect(normalizeKey('Treaty Name', exact)).toBe('TreatyName');
 		expect(normalizeKey('Heading', exact)).not.toBe(normalizeKey('heading', exact));
 	});
 
