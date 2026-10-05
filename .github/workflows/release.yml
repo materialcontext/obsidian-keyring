@@ -1,50 +1,91 @@
-name: Release Obsidian plugin
+name: Release
 
+# Publishes a GitHub release whenever a push to main changes the version in
+# manifest.json. To release: `npm version <patch|minor|major> --no-git-tag-version`
+# in a PR, then merge it. Pushes that don't change the version do nothing.
+# Run the workflow by hand to retry a version whose release is missing.
 on:
   push:
-    tags:
-      - '*'
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
-  build:
+  release:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      id-token: write
-      attestations: write
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Decide whether to release
+        id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          version=$(node -p "require('./manifest.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if gh release view "$version" > /dev/null 2>&1; then
+            echo "Release $version already exists."
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          elif [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "Manual run: releasing $version."
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          else
+            previous=$(git show "$BEFORE:manifest.json" 2> /dev/null \
+              | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).version" 2> /dev/null \
+              || echo "none")
+            if [ "$previous" = "$version" ]; then
+              echo "Version unchanged ($version); nothing to release."
+              echo "release=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "Version changed: $previous -> $version."
+              echo "release=true" >> "$GITHUB_OUTPUT"
+            fi
+          fi
 
       - name: Use Node.js
+        if: steps.plan.outputs.release == 'true'
         uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: 'npm'
 
-      - name: Build plugin
+      - name: Check and build
+        if: steps.plan.outputs.release == 'true'
         run: |
           npm ci
+          node check-version.mjs
           npm run build
-
-      - name: Check for optional styles
-        id: styles
-        run: |
-          [ -f styles.css ] && echo "exists=true" >> "$GITHUB_OUTPUT" || echo "exists=false" >> "$GITHUB_OUTPUT"
+          npm test
+          npm run lint
+          npm run format:check
 
       - name: Attest build provenance
+        if: steps.plan.outputs.release == 'true'
         uses: actions/attest@v4
         with:
           subject-path: |
             main.js
-            ${{ steps.styles.outputs.exists == 'true' && 'styles.css' || '' }}
+            styles.css
 
-      - name: Create release
+      - name: Publish release
+        if: steps.plan.outputs.release == 'true'
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.plan.outputs.version }}
         run: |
-          tag="${GITHUB_REF#refs/tags/}"
-
-          gh release create "$tag" \
-            --title="$tag" \
-            --draft \
-            main.js manifest.json ${{ steps.styles.outputs.exists == 'true' && 'styles.css' || '' }}
+          gh release create "$VERSION" \
+            --target "$GITHUB_SHA" \
+            --title "$VERSION" \
+            --generate-notes \
+            main.js manifest.json styles.css
