@@ -75,6 +75,29 @@ A series of peace treaties…
 
 Marks inside code, math, links and frontmatter are ignored.
 
+### Toggle mark command
+
+**Keyring: Toggle mark** adds or removes the braces, the way Ctrl/Cmd-I toggles italics:
+
+- **Text selected:** wraps it as `{{text}}`. Spaces at either end of the selection stay outside.
+- **Cursor in a word:** wraps that word.
+- **Cursor or selection on a mark:** unwraps it and keeps the visible text. `{{target|display}}` becomes `display`.
+- **Anywhere else:** inserts `{{}}` with the cursor between the braces.
+
+It works with multiple cursors, one per line. Marks can't span lines, so a selection across lines is left alone.
+
+**Hotkey.** Keyring doesn't set one by default, so it can't clash with yours. Open Settings → Hotkeys, search for "Toggle mark", click **+** and press your combination (Ctrl/Cmd+Shift+K, say). Obsidian warns you if the combination is already taken.
+
+**Leader key (Vim mode).** Obsidian's hotkeys can't be key sequences. With Vim key bindings and the [Vimrc Support](https://github.com/esm7/obsidian-vimrc-support) plugin, add this to your `.obsidian.vimrc`:
+
+```vim
+exmap keyringmark obcommand keyring:toggle-mark
+" map, not nmap, so it works in normal and visual mode
+map <leader>k :keyringmark<CR>
+```
+
+In normal mode, `<leader>k` marks the word under the cursor; in visual mode, the selection.
+
 ## Settings
 
 | Setting                 | Default |                                                                                                                                                                                                           |
@@ -88,6 +111,7 @@ Changes save immediately and apply to open notes as soon as you stop typing. All
 
 ## Commands
 
+- **Keyring: Toggle mark** adds or removes a mark at the cursor or selection. See [Toggle mark command](#toggle-mark-command).
 - **Keyring: Dump index stats** shows how many terms, sections and notes are indexed.
 - **Keyring: Log editor syntax nodes** shows the editor's syntax node names at the cursor. Use it to report a place where marks should or shouldn't be detected.
 

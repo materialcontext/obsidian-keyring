@@ -9,6 +9,7 @@ import { stats } from './core/termIndex';
 import { registerHover } from './obsidian/hover';
 import { createIndexer, type Indexer } from './obsidian/indexer';
 import { createLivePreview, type LivePreview } from './obsidian/livePreview';
+import { toggleMarkInEditor } from './obsidian/markCommand';
 import { markPostProcessor, rerenderReadingViews } from './obsidian/readingView';
 import { createSettingsApplier } from './obsidian/settingsApplier';
 import { KeyringSettingTab } from './obsidian/settingsTab';
@@ -42,6 +43,13 @@ export default class KeyringPlugin extends Plugin {
 				update: (patch) => this.updateSettings(patch),
 			}),
 		);
+
+		// No default hotkey (Obsidian's plugin guidelines): users bind it in Settings → Hotkeys.
+		this.addCommand({
+			id: 'toggle-mark',
+			name: 'Toggle mark',
+			editorCallback: (editor) => toggleMarkInEditor(editor),
+		});
 
 		this.addCommand({
 			id: 'dump-index-stats',

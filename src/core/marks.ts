@@ -1,13 +1,8 @@
-import type { MarkRange } from './types';
+import type { MarkRange, Span } from './types';
 
 const OPEN = '{{';
 const CLOSE = '}}';
 const PIPE = '|'.charCodeAt(0);
-
-interface Span {
-	readonly from: number;
-	readonly to: number;
-}
 
 /**
  * Find every mark in `text`. A mark never spans a newline, and marks don't

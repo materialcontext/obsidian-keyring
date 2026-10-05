@@ -47,6 +47,7 @@ src/
     order.ts           compareSections; orderEntries(sorted, currentPath) hoists the current file
     chain.ts           nextChain(parent, key, maxDepth) -> chain | null (cycle guard)
     markLayout.ts      layoutMark(mark, selection, hideSyntax) -> styled + hidden spans
+    markEdit.ts        toggleMark(line, selection) -> one line edit + new selection
     settings.ts        Settings type, defaults, sanitizeSettings, input parsers, settingsImpact
     types.ts           Shared core types
   obsidian/
@@ -58,6 +59,7 @@ src/
     dom.ts             Shared class/attribute names, DOM helpers
     settingsTab.ts     PluginSettingTab via getSettingDefinitions() (Obsidian 1.13+)
     settingsApplier.ts Batches the reindex/refresh a settings change needs
+    markCommand.ts     The Toggle mark editor command
 styles.css
 tests/                 vitest, core only
 ```
@@ -116,6 +118,15 @@ The index stores offsets only. Section text is read lazily at hover time via `va
 - When the selection does not touch a mark, hide the `{{`, `}}` and the `target|` prefix with `Decoration.replace`, the same way Obsidian hides link syntax. When the cursor is inside, show the raw text.
 - Only hide syntax when `editorLivePreviewField` is true. In Source mode, mark the text but hide nothing.
 - Recompute on `docChanged`, `viewportChanged` and `selectionSet`, plus syntax-tree, file and Live Preview/Source mode changes. Marks are rescanned only for document, viewport, tree or file changes. A selection change rebuilds decorations only when the set of marks the selection touches changed (see `docs/PERFORMANCE.md` P8).
+
+**Toggle mark command** (added after milestone 7)
+- An editor command, `keyring:toggle-mark`, that works like Ctrl-I for italics. With no default hotkey (per Obsidian's guidelines), users bind it themselves. Vim users can map a leader key to it through the Vimrc Support plugin (see README).
+- `core/markEdit.ts` `toggleMark(line, selection)` decides the edit:
+  - unwrap any marks the selection touches, keeping their visible text
+  - otherwise wrap the trimmed selection
+  - otherwise wrap the word at the cursor
+  - otherwise insert `{{}}`
+- `obsidian/markCommand.ts` applies one change per line through the `Editor` API, then sets the selections. `obsidian.d.ts` doesn't say which document a transaction's positions refer to (before or after its changes), and with one change per line it doesn't matter. Multi-line selections are refused with a Notice, and only the first selection on a line is toggled.
 
 **Hover controller**
 - A single delegated `mouseover` handler, registered with `registerDomEvent` on each window's document (main window, plus `window-open` for popouts), catches `.keyring-mark` from both modes and from inside popovers. There is no per-element wiring. No `mouseout` handler is needed: `HoverPopover` attaches its own listeners to the target element.
