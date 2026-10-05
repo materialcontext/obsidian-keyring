@@ -1,9 +1,4 @@
-import type { MarkRange } from './types';
-
-export interface Span {
-	readonly from: number;
-	readonly to: number;
-}
+import type { MarkRange, Span } from './types';
 
 /** How an editor shows one mark: the span to style, and the syntax to hide. */
 export interface MarkLayout {

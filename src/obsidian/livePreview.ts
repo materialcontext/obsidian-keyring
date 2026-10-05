@@ -9,10 +9,10 @@ import {
 } from '@codemirror/view';
 import type { NodeType, SyntaxNode, Tree } from '@lezer/common';
 import { editorInfoField, editorLivePreviewField } from 'obsidian';
-import { isTouched, layoutMark, type Span } from '../core/markLayout';
+import { isTouched, layoutMark } from '../core/markLayout';
 import { parseMarks } from '../core/marks';
 import { isExcluded, pathRules } from '../core/paths';
-import type { MarkRange } from '../core/types';
+import type { MarkRange, Span } from '../core/types';
 import { MARK_CLASS, SOURCE_ATTR, TARGET_ATTR } from './dom';
 
 /**

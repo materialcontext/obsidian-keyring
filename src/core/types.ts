@@ -1,3 +1,9 @@
+/** A half-open range of offsets, `from` inclusive, `to` exclusive. */
+export interface Span {
+	readonly from: number;
+	readonly to: number;
+}
+
 /** A normalized heading or mark target. Only `normalizeKey` produces these. */
 export type Key = string & { readonly __brand: 'Key' };
 
