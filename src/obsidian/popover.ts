@@ -76,12 +76,16 @@ export function renderPopover(
 			`${basename(entry.path)} › ${entry.heading}`,
 		);
 		label.setAttribute('role', 'link');
-		label.addEventListener('click', (evt) => {
+		label.tabIndex = 0;
+		const open = (evt: MouseEvent | KeyboardEvent) =>
 			void app.workspace.openLinkText(
 				`${entry.path}#${entry.heading}`,
 				sourcePath,
 				Keymap.isModEvent(evt),
 			);
+		label.addEventListener('click', open);
+		label.addEventListener('keydown', (evt) => {
+			if (evt.key === 'Enter') open(evt);
 		});
 		const body = el(doc, 'div', 'keyring-body');
 		block.append(label, body);

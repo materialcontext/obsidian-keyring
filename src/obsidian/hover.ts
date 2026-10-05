@@ -43,7 +43,7 @@ export function registerHover(
 	);
 }
 
-export function createHoverHandler(
+function createHoverHandler(
 	app: App,
 	indexer: Indexer,
 	getSettings: () => HoverSettings,

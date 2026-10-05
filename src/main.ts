@@ -18,6 +18,7 @@ export default class KeyringPlugin extends Plugin {
 	indexer!: Indexer;
 	livePreview!: LivePreview;
 	private applySettings!: ReturnType<typeof createSettingsApplier>;
+	private saving: Promise<void> = Promise.resolve();
 
 	override async onload(): Promise<void> {
 		this.settings = sanitizeSettings(await this.loadData());
@@ -65,11 +66,14 @@ export default class KeyringPlugin extends Plugin {
 		});
 	}
 
-	/** Save a change, then apply whatever it requires (settingsImpact decides, the applier batches). */
-	async updateSettings(patch: Partial<KeyringSettings>): Promise<void> {
+	/** Change settings, apply whatever that requires (settingsImpact decides, the applier batches), and save. */
+	updateSettings(patch: Partial<KeyringSettings>): Promise<void> {
 		const previous = this.settings;
 		this.settings = { ...previous, ...patch };
-		await this.saveData(this.settings);
 		this.applySettings(settingsImpact(previous, this.settings));
+		// Writes run one at a time, each with the latest settings, so a slow write
+		// can't land after a newer one. A failed write doesn't block later ones.
+		this.saving = this.saving.catch(() => undefined).then(() => this.saveData(this.settings));
+		return this.saving;
 	}
 }

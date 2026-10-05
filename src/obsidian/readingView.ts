@@ -26,7 +26,7 @@ export function markPostProcessor(
 	};
 }
 
-export function wrapMarks(root: HTMLElement, sourcePath: string): void {
+function wrapMarks(root: HTMLElement, sourcePath: string): void {
 	const doc = root.ownerDocument;
 	const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT);
 	const candidates: Text[] = [];

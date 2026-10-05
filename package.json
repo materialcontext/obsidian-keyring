@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-keyring",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"description": "Hover {{term}} marks to see every section in your vault with a matching heading.",
 	"main": "main.js",
 	"type": "module",
