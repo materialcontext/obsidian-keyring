@@ -1,8 +1,82 @@
 # Keyring
 
-Mark a term inline with `{{term}}` or `{{term|display text}}`. Hovering the mark shows every section in your vault whose heading matches `term`, in one scrollable popover.
+Mark a term inline as `{{term}}`. Hovering it opens a popover with every section in your vault whose heading matches the term, from every note, in one scrollable list.
 
-> Work in progress. See [`docs/SPEC.md`](docs/SPEC.md) for the design and milestones.
+Keyring suits glossaries, character and place notes, recurring concepts: any term you define under a heading somewhere and want at hand wherever you mention it.
+
+## Usage
+
+Write a mark around a term:
+
+```markdown
+The {{Treaty of Westphalia}} ended the war.
+The {{Treaty of Westphalia|treaty}} was signed in 1648.
+```
+
+- `{{target}}` shows the target as written.
+- `{{target|display text}}` shows the display text but looks up the target.
+
+Hover a mark to see every section headed with that target. A **section** is everything under a heading, up to the next heading of the same or higher level (or the end of the note). With the example above, both of these notes would contribute an entry:
+
+```markdown
+## Treaty of Westphalia
+
+Signed in Osnabrück and Münster…
+```
+
+```markdown
+# treaty of westphalia
+
+A series of peace treaties…
+```
+
+### Matching
+
+- **Whitespace is ignored:** `{{NewYork}}` matches `## New York`.
+- **Capitalization is ignored** by default. Turn on _Case-sensitive matching_ to require it.
+- **Markdown inside headings** is matched as written. `## **Bold** term` matches `{{**Bold** term}}`, not `{{Bold term}}`.
+
+### Popovers
+
+- **Ordering:** entries from the note you're in come first, then the rest sorted by path, then by position within each note.
+- **Source labels:** each entry is labelled `note › Heading`. Click a label to open the section; Ctrl/Cmd-click opens it in a new tab.
+- **Long lists:** the first 20 entries show straight away, and **Show more** loads the rest. Entries render as you scroll to them.
+- **Nesting:** marks inside a popover are live, so hovering one opens a nested popover. A term already open in the chain won't open again, so cycles are cut off. Depth is capped by _Maximum nesting depth_.
+- **No match:** a mark with no matching heading shows "No sections titled “…”".
+
+### Editing
+
+- **Reading view:** marks show as dotted-underlined text.
+- **Live Preview:** `{{`, `target|` and `}}` are hidden. Moving the cursor into a mark reveals its raw text, the same way links behave.
+- **Source mode:** marks are underlined and nothing is hidden.
+
+Marks inside code, math, links and frontmatter are ignored.
+
+## Settings
+
+| Setting                 | Default |                                                                                                                                                         |
+| ----------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Case-sensitive matching | Off     | Require capitalization to match.                                                                                                                        |
+| Hover delay             | 300 ms  | How long to hover before a popover opens (0–5000).                                                                                                      |
+| Maximum nesting depth   | 5       | How many popovers can open inside each other (1–20).                                                                                                    |
+| Excluded folders        | None    | One folder per line. Notes there are not indexed and their marks are not highlighted. Use this for template folders with `{{date}}`-style placeholders. |
+
+Changes apply immediately to open notes.
+
+## Commands
+
+- **Keyring: Dump index stats** shows how many terms, sections and notes are indexed.
+- **Keyring: Log editor syntax nodes** shows the editor's syntax node names at the cursor. Use it to report a place where marks should or shouldn't be detected.
+
+## Limitations
+
+- **Formatting across a mark** isn't supported in Reading view: `{{**bold**}}` splits into several pieces of text and isn't recognized. Put formatting around the mark (`**{{term}}**`) instead.
+- **Tables:** inside a Markdown table, `|` separates cells, so the `{{target|display}}` form breaks there, as it does for wikilinks. Use plain `{{target}}` in tables.
+- **One line, no nesting:** a mark can't span lines, marks don't nest (in `{{a {{b}} c}}`, only `b` is a mark), and `{{}}` with an empty target is plain text.
+- **Repeated headings:** if a note repeats a heading, both entries appear in the popover, but clicking either label opens the first.
+- **Special characters:** clicking a label for a heading that contains `#`, `|` or `^` may not jump to it, because those characters have special meaning in Obsidian links.
+- **Undocumented editor internals:** Live Preview detects code and math using the editor's syntax node names, which Obsidian doesn't document. If marks show up where they shouldn't, run _Log editor syntax nodes_ there and report what it shows.
+- **Desktop only:** popovers open on mouse hover.
 
 ## Development
 

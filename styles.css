@@ -48,3 +48,7 @@
 .keyring-more {
 	margin-top: var(--size-4-3);
 }
+
+.keyring-invalid {
+	border-color: var(--text-error);
+}

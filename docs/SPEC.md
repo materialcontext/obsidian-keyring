@@ -38,7 +38,6 @@ The codebase has a functional, Obsidian-free core and a thin adapter layer. Mana
 ```
 src/
   main.ts              Plugin lifecycle and wiring only. No logic.
-  settings.ts          Settings type, defaults, settings tab.
   core/                NO imports from 'obsidian'. Pure, unit-tested.
     normalize.ts       normalizeKey(text, {caseSensitive}) -> Key
     marks.ts           parseMarks(text) -> MarkRange[]
@@ -48,6 +47,7 @@ src/
     order.ts           compareSections; orderEntries(sorted, currentPath) hoists the current file
     chain.ts           nextChain(parent, key, maxDepth) -> chain | null (cycle guard)
     markLayout.ts      layoutMark(mark, selection, hideSyntax) -> styled + hidden spans
+    settings.ts        Settings type, defaults, sanitizeSettings, input parsers, settingsImpact
     types.ts           Shared core types
   obsidian/
     indexer.ts         Builds/maintains TermIndex from metadataCache + vault events
@@ -56,6 +56,7 @@ src/
     hover.ts           Single hover controller
     popover.ts         Popover content: entries, cap, lazy bodies
     dom.ts             Shared class/attribute names, DOM helpers
+    settingsTab.ts     PluginSettingTab (classic display(); see the note under Settings)
 styles.css
 tests/                 vitest, core only
 ```
@@ -128,12 +129,20 @@ The index stores offsets only. Section text is read lazily at hover time via `va
 
 ## Settings
 
-| Setting | Default |
-|---|---|
-| Case-sensitive matching | off |
-| Hover delay (ms) | 300 |
-| Max nesting depth | 5 |
-| Excluded folders (list) | empty |
+| Setting | Default | Range |
+|---|---|---|
+| Case-sensitive matching | off | |
+| Hover delay (ms) | 300 | 0–5000 |
+| Max nesting depth | 5 | 1–20 |
+| Excluded folders (list) | empty | one per line |
+
+- **Loading:** `sanitizeSettings` validates settings read from disk field by field. An invalid field falls back to its default.
+- **Invalid input:** the tab marks out-of-range numbers invalid and doesn't save them. The folder list applies 500 ms after typing pauses.
+- **Applying changes:** `settingsImpact` decides what a change needs.
+  - Case sensitivity rebuilds the index.
+  - Excluded folders rebuild the index, rescan open editors (a CodeMirror state effect) and re-render Reading views.
+  - Delay and depth are read live.
+- **Settings search:** Obsidian 1.13's declarative `getSettingDefinitions()` API would add this, but `minAppVersion` is 1.5.0. The linter warns about this. Revisit if `minAppVersion` is raised to 1.13.
 
 ## Milestones
 
