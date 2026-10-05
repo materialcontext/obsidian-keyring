@@ -47,6 +47,7 @@ src/
     paths.ts           Excluded-folder rules, rename -> IndexOp
     order.ts           compareSections; orderEntries(sorted, currentPath) hoists the current file
     chain.ts           nextChain(parent, key, maxDepth) -> chain | null (cycle guard)
+    markLayout.ts      layoutMark(mark, selection, hideSyntax) -> styled + hidden spans
     types.ts           Shared core types
   obsidian/
     indexer.ts         Builds/maintains TermIndex from metadataCache + vault events
@@ -108,11 +109,11 @@ The index stores offsets only. Section text is read lazily at hover time via `va
 
 **Live Preview**
 - A CM6 `ViewPlugin` computes decorations over `view.visibleRanges`, using `syntaxTree` to skip code and math nodes.
-- Node names in Obsidian's grammar are not documented. Log them at runtime and skip names containing `code` or `math`, then tighten.
+- Node names in Obsidian's grammar are not documented. Log them at runtime and skip names containing `code` or `math`, then tighten. Implemented as a substring match on `code|math|link|url|comment|frontmatter`, which mirrors Reading view's skip list. The "Log editor syntax nodes" command prints the node names at the cursor.
 - Each mark gets `Decoration.mark` with the same class and `data-` attributes as Reading view. Get the source path from `view.state.field(editorInfoField).file`.
 - When the selection does not touch a mark, hide the `{{`, `}}` and the `target|` prefix with `Decoration.replace`, the same way Obsidian hides link syntax. When the cursor is inside, show the raw text.
 - Only hide syntax when `editorLivePreviewField` is true. In Source mode, mark the text but hide nothing.
-- Recompute on `docChanged`, `viewportChanged` and `selectionSet`.
+- Recompute on `docChanged`, `viewportChanged` and `selectionSet`, plus syntax-tree, file and Live Preview/Source mode changes. Marks are rescanned only for document, viewport, tree or file changes. A selection change rebuilds decorations only when the set of marks the selection touches changed (see `docs/PERFORMANCE.md` P8).
 
 **Hover controller**
 - A single delegated `mouseover` handler, registered with `registerDomEvent` on each window's document (main window, plus `window-open` for popouts), catches `.keyring-mark` from both modes and from inside popovers. There is no per-element wiring. No `mouseout` handler is needed: `HoverPopover` attaches its own listeners to the target element.
@@ -166,6 +167,14 @@ Work one milestone at a time. Stop at the end of each for review.
 6. **Settings + polish.**
    - Add the settings tab, excluded folders, and the no-match message.
    - Write a README covering the syntax and its limitations.
+7. **Final review.**
+   - Review the whole codebase for stylistic and architectural consistency:
+     - naming, module boundaries and the one-way `obsidian/` → `core/` direction
+     - comment density, error handling and DOM/API usage, which should match across modules
+     - docs (`SPEC.md`, `PERFORMANCE.md`, README, `CLAUDE.md`) agreeing with the code
+   - Hunt for dead code: unused exports, helpers, settings, CSS classes and stale comments.
+   - Hunt for bugs, including edge cases the tests don't cover.
+   - *Done when:* every finding is fixed or recorded with a reason, and build, tests, lint and format all pass.
 
 **Stretch (only if asked):**
 - Unresolved-mark styling.

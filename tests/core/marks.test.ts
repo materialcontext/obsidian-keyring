@@ -138,3 +138,27 @@ describe('parseMarks agrees with the reference scanner', () => {
 		}
 	});
 });
+
+describe('parseMarks offset', () => {
+	it('adds the offset to every position', () => {
+		const text = 'x {{a|b}}';
+		const [plain] = parseMarks(text);
+		const [shifted] = parseMarks(text, 100);
+		expect(shifted).toEqual({
+			...plain,
+			from: plain!.from + 100,
+			to: plain!.to + 100,
+			displayFrom: plain!.displayFrom + 100,
+			displayTo: plain!.displayTo + 100,
+		});
+	});
+});
+
+describe('parseMarks whitespace', () => {
+	it('trims Unicode whitespace as well as ASCII', () => {
+		expect(parseMarks('{{ term |　shown\t}}')[0]).toMatchObject({
+			target: 'term',
+			display: 'shown',
+		});
+	});
+});

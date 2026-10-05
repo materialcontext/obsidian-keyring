@@ -26,13 +26,13 @@ export const syntheticIndex = (files: number, perFile = 5): TermIndex =>
 	applyOps(emptyIndex({ caseSensitive: false }), syntheticOps(files, perFile));
 
 /** Prose with a mark roughly every `every` characters (0 = no marks). */
-export function prose(length: number, every: number): string {
+export function prose(length: number, every: number, mark = '{{Shared Term 0|a term}}'): string {
 	const word = 'lorem ipsum dolor sit amet consectetur ';
 	let out = '';
 	let sinceMark = 0;
 	while (out.length < length) {
 		if (every > 0 && sinceMark >= every) {
-			out += '{{Shared Term 0|a term}} ';
+			out += `${mark} `;
 			sinceMark = 0;
 		}
 		out += word;

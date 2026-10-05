@@ -35,6 +35,10 @@ section('Editor path (per keystroke / scroll)');
 		parseMarks(bigWithMarks),
 	);
 	measure('parseMarks, 100 KB, no marks', () => parseMarks(bigNoMarks));
+	const plainMarks = prose(100_000, 300, '{{Shared Term 0}}');
+	measure(`parseMarks, 100 KB (${parseMarks(plainMarks).length} marks without |display)`, () =>
+		parseMarks(plainMarks),
+	);
 }
 
 section('Index maintenance (per metadata change)');
